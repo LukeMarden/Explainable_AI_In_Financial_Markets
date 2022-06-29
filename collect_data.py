@@ -11,4 +11,4 @@ sp500 = ['MMM', 'AOS', 'ABT', 'ABBV', 'ABMD', 'ACN', 'ATVI', 'ADM', 'ADBE', 'AAP
 for i in range(len(sp500)):
     print(str(i) + '_' + sp500[i] + '_' + str(10))
     df = yf.download(sp500[i], start_date, end_date)
-    df.to_csv('data/s&p500/' + sp500[i] + '_y= ' + str(10) + '.csv')
+    df.to_csv('data/s&p500/' + sp500[i] + '.csv')
