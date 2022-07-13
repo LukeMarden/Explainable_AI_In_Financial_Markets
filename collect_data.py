@@ -18,12 +18,14 @@ class collect_data:
         self.start_date = start_date
         self.end_date = end_date
 
+    # downloads s&p500 company data to csv files to prevent too many requests on yahoo finance
     def download_sp500(self):
         for i in range(len(self.sp500)):
             print(str(i) + '_' + self.sp500[i] + '_' + str(10))
             df = yf.download(self.sp500[i], self.start_date, self.end_date)
             df.to_csv('data/s&p500/' + self.sp500[i] + '.csv')
 
+    # downloads ftse100 company data to csv files to prevent too many requests on yahoo finance
     def download_ftse100(self):
         for i in range(len(self.ftse100_tickers)):
             print(str(i) + '_' + self.ftse100_tickers[i] + '_' + str(10))
