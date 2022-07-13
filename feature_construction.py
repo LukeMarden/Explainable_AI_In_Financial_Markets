@@ -1,4 +1,5 @@
 import pandas as pd
+import pandas_ta as ta
 
 def simple_moving_average(data, num_of_days):
     moving_average = data['Close'].rolling(num_of_days).mean()
@@ -34,3 +35,4 @@ if __name__ == '__main__':
     token = 'MSFT'
     data = pd.read_csv('data/s&p500/' + token + '.csv')
     print(simple_moving_average(data, 20))
+    print(ta.sma(data['Close'], 20))
