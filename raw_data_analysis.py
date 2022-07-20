@@ -35,6 +35,10 @@ class raw_data_analysis:
         for value in x:
             y.append(data[data['Date'] == value].shape[0])
         plt.bar(x, y, color='green', width=0.2)
+        plt.xlabel('Date')
+        plt.ylabel('Number Of Occurrences')
+        plt.title('0 Volume Trading Days')
+
         plt.show()
 
 
