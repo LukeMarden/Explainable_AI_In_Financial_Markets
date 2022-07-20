@@ -8,13 +8,13 @@ if __name__ == '__main__':
     ftse100_tickers = collect_data.ftse100_tickers
 
     #pre processing
-    
+
 
 
     # contruct features such as indicators
     feature_construction = feature_construction(ftse100_tickers)
     feature_construction.process_indicators()
-    tables = feature_construction.tables
+    feature_tables = feature_construction.feature_tables
 
 
 
