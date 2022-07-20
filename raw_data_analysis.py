@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
     raw_data_analysis = raw_data_analysis(tickers)
-    # raw_data_analysis.show_missing_data()
-    # raw_data_analysis.show_ranges()
-    # print(raw_data_analysis.tables[tickers[0]].info())
+    raw_data_analysis.show_missing_data()
+    raw_data_analysis.show_ranges()
+    print(raw_data_analysis.tables[tickers[0]].info())
     raw_data_analysis.isolate_zero_volume()
