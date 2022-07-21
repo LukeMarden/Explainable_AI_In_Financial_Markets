@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 class raw_data_analysis:
 
     def __init__(self, tickers):
+        self.continuous_features = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']
         self.tickers = tickers
         self.tables = {}
         for ticker in self.tickers:
@@ -43,7 +44,13 @@ class raw_data_analysis:
 
     def plot_raw_data(self, ticker):
         #function used to plot date against close, volume etc
-        print()
+        for variable in self.continuous_features:
+            # self.tables[ticker].plot('Date', variable)
+            self.tables[ticker].plot('Date', variable, legend=None)
+            plt.title(ticker)
+            plt.ylabel(variable)
+            plt.show()
+
 
 
 if __name__ == '__main__':
@@ -54,3 +61,4 @@ if __name__ == '__main__':
     raw_data_analysis.show_ranges()
     print(raw_data_analysis.tables[tickers[0]].info())
     raw_data_analysis.isolate_zero_volume()
+    raw_data_analysis.plot_raw_data(tickers[0])
