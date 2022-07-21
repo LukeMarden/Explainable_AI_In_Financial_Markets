@@ -41,6 +41,9 @@ class raw_data_analysis:
 
         plt.show()
 
+    def plot_raw_data(self, ticker):
+        #function used to plot date against close, volume etc
+        print()
 
 
 if __name__ == '__main__':
