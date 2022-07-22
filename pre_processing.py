@@ -3,10 +3,9 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.neighbors import LocalOutlierFactor
+from sklearn.neighbors import LocalOutlierFactor, NearestNeighbors
 from sklearn.cluster import DBSCAN
 from sklearn.ensemble import IsolationForest
-from pyod.models.knn import KNN
 from collect_data import *
 
 
@@ -24,7 +23,7 @@ class pre_processing:
             if self.tables[ticker].isnull().any(axis=1).sum():
                 print(self.tables[ticker][self.tables[ticker].isna().any(axis=1)])
 
-    def outlier_detection(self, show_box_plots=False, show_LocalOutlierFactor=True, showDBSCAN=False, show_knn=False, show_IsolationForest=False):
+    def outlier_detection(self, show_box_plots=False, show_LocalOutlierFactor=False, showDBSCAN=True, show_IsolationForest=False, contamination=0.05):
         for ticker in self.tickers:
             self.tables[ticker].dropna(inplace=True)
             if show_box_plots is True:
@@ -39,11 +38,11 @@ class pre_processing:
                 #code as per:
                 # https://scikit-learn.org/stable/auto_examples/neighbors/plot_lof_outlier_detection.html
                 np.random.seed(42)
-                clf = LocalOutlierFactor(n_neighbors=20, contamination=0.01)
+                clf = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
                 y_pred = clf.fit_predict(self.tables[ticker][self.continuous_features])
 
                 outlier_count = (y_pred==-1).sum()
-                print("Number of predicted outliers:", outlier_count)
+                print("LOF outliers in " + ticker + " is " + str(outlier_count))
 
                 X_scores = clf.negative_outlier_factor_
 
@@ -63,22 +62,17 @@ class pre_processing:
                 legend.legendHandles[1]._sizes = [20]
                 plt.show()
             if showDBSCAN is True:
-                print()
-            if show_knn is True:
-                print()
+                outlier_detection = DBSCAN(min_samples=8, eps=40000)
+                clusters = outlier_detection.fit_predict(self.tables[ticker][self.continuous_features])
+                print("DBSCAN outliers in " + ticker + " is " + str(list(clusters).count(-1)))
             if show_IsolationForest is True:
-                clf = IsolationForest(random_state=1, contamination=0.01)
-                for feature in self.continuous_features:
-                    preds = clf.fit_predict(self.tables[ticker][feature].to_numpy().reshape(-1, 1))
-                    totalOutliers = 0
-                    for pred in preds:
-                        print(ticker, ' = ', pred)
-                        if pred == -1:
-                            totalOutliers = totalOutliers + 1
-                    print("outliers in " + feature + " of " + ticker + " is " + str(totalOutliers))
-                    # print("Total number of outliers identified is: ", totalOutliers)
-
-
+                clf = IsolationForest(random_state=1, contamination=contamination)
+                preds = clf.fit_predict(self.tables[ticker][self.continuous_features])
+                totalOutliers = 0
+                for pred in preds:
+                    if pred == -1:
+                        totalOutliers = totalOutliers + 1
+                print("Isolation Forest outliers in " + ticker + " is " + str(totalOutliers))
 
     def perform_preprocessing(self):
         for ticker in self.tickers:
