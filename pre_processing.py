@@ -89,18 +89,18 @@ class pre_processing:
             preds = clf.fit_predict(self.tables[ticker][self.continuous_features])
             self.tables[ticker]['isof'] = preds.tolist()
             major_outliers = self.tables[ticker].query('lof==-1 and isof==-1 and dbscan==-1')
-            major_outliers.to_csv(ticker + '_major_outliers.csv')
+            major_outliers.to_csv('data/generated/outliers/' + ticker + '_major_outliers.csv')
             minor_outliers = self.tables[ticker].query(
                 '(lof==-1 and isof==-1 and dbscan!=-1) or '
                 '(lof==-1 and isof!=-1 and dbscan==-1) or '
                 '(lof!=-1 and isof==-1 and dbscan==-1)'
             )
-            minor_outliers.to_csv(ticker + '_minor_outliers.csv')
+            minor_outliers.to_csv('data/generated/outliers/' + ticker + '_minor_outliers.csv')
             print(list(major_outliers.index))
             self.tables[ticker]['outlier'] = 0
             self.tables[ticker].loc[list(major_outliers.index), 'outlier'] = 1
             self.tables[ticker].drop(columns=['lof', 'isof', 'dbscan'], inplace=True)
-            self.tables[ticker].to_csv(ticker + '_outliers.csv')
+            self.tables[ticker].to_csv('data/generated/outliers/' + ticker + '_outliers.csv')
 
     def perform_preprocessing(self, contamination=0.05):
         for ticker in self.tickers:
@@ -123,6 +123,10 @@ class pre_processing:
             self.tables[ticker]['outlier'] = 0
             self.tables[ticker].loc[list(major_outliers.index), 'outlier'] = 1
             self.tables[ticker].drop(columns=['lof', 'isof', 'dbscan'], inplace=True)
+
+
+
+
 
 
 
