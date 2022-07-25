@@ -1,5 +1,8 @@
 import pandas as pd
 import pandas_ta as ta
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 def simple_moving_average(data, num_of_days):
     moving_average = data['Close'].rolling(num_of_days).mean()
@@ -33,23 +36,74 @@ class feature_construction:
     def __init__(self, tables):
         self.tables = tables
         self.tickers = list(self.tables.keys())
-        self.feature_tables = {}
 
     def process_indicators(self):
 
         for ticker in self.tickers:
             df = self.tables[ticker]
             df.set_index(pd.DatetimeIndex(df["Date"]), inplace=True)
-            df.ta.strategy("All")
-            self.feature_tables[ticker] = df
 
+            mystrat = ta.Strategy(
+                name='first',
+                ta=[
+                    {"kind": "sma", "length": 7},
+                    {"kind": "sma", "length": 14},
+                    {"kind": "sma", "length": 30},
+                    {"kind": "ema", "length": 7},
+                    {"kind": "ema", "length": 14},
+                    {"kind": "ema", "length": 30},
+                    {"kind": "rsi", "length": 14},
+                    {"kind": "macd"},
+                    {"kind": "adx", "length": 14},
+                    {"kind": "stoch"},
+                    {"kind": "bbands", "length": 14, "std": 2},
+                ]
+            )
+            df.ta.strategy(mystrat)
+            df.dropna(inplace=True)
+            # print(ticker + ' & ' + str(df.shape[0]) + ' & ' + str(df.shape[1]))
+            # df.to_csv(ticker + '_features.csv')
+            self.tables[ticker] = df
+
+    def show_correlation(self):
+        for ticker in self.tickers:
+            df = self.tables[ticker]
+            df.drop('Date', axis=1, inplace=True)
+            plt.figure(figsize=(12, 10))
+            sns.heatmap(df.corr(), annot=False, cmap=plt.cm.Reds)
+            plt.show()
+
+    def final_features(self):
+        for ticker in self.tickers:
+            df = self.tables[ticker]
+            df.set_index(pd.DatetimeIndex(df["Date"]), inplace=True)
+
+            mystrat = ta.Strategy(
+                name='first',
+                ta=[
+                    {"kind": "sma", "length": 14},
+                    {"kind": "ema", "length": 14},
+                    {"kind": "rsi", "length": 14},
+                    {"kind": "macd"},
+                    {"kind": "adx", "length": 14},
+                    {"kind": "stoch"},
+                    {"kind": "bbands", "length": 14, "std": 2},
+                ]
+            )
+            df.ta.strategy(mystrat)
+            df.dropna(inplace=True)
+            df.drop(['MACDs_12_26_9', 'Open', 'High', 'Low', 'Close'], inplace=True)
+            self.tables[ticker] = df
 
 if __name__ == '__main__':
-    # token = 'MSFT'
-    # data = pd.read_csv('data/s&p500/' + token + '.csv')
-    # print(simple_moving_average(data, 20))
-    # print(ta.sma(data['Close'], 20))
     tables = {}
-    tables['WTB.L'] = pd.read_csv('data/ftse100/' + 'WTB.L' + '.csv')
+    tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
+    for ticker in tickers:
+        tables[ticker] = pd.read_csv('data/ftse100/' + ticker + '.csv')
+
     construct_features = feature_construction(tables)
     construct_features.process_indicators()
+    construct_features.show_correlation()
+
+    construct_features.tables = tables
+    construct_features.final_features()

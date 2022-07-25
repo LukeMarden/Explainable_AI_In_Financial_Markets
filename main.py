@@ -13,8 +13,8 @@ if __name__ == '__main__':
 
     # contruct features such as indicators
     feature_construction = feature_construction(ftse100_tickers)
-    feature_construction.process_indicators()
-    feature_tables = feature_construction.feature_tables
+    feature_construction.final_features()
+    feature_tables = feature_construction.tables
 
 
 

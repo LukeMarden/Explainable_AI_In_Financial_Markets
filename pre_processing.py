@@ -102,6 +102,10 @@ class pre_processing:
             self.tables[ticker].drop(columns=['lof', 'isof', 'dbscan'], inplace=True)
             self.tables[ticker].to_csv('data/generated/outliers/' + ticker + '_outliers.csv')
 
+    def variable_scaling(self):
+        print()
+
+
     def perform_preprocessing(self, contamination=0.05):
         for ticker in self.tickers:
             self.tables[ticker].dropna(inplace=True)
