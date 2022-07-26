@@ -2,6 +2,8 @@ import pandas as pd
 import pandas_ta as ta
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.preprocessing import MinMaxScaler
+from pre_processing import *
 
 
 def simple_moving_average(data, num_of_days):
@@ -68,6 +70,7 @@ class feature_construction:
     def show_correlation(self):
         for ticker in self.tickers:
             df = self.tables[ticker]
+            df.drop(columns='outlier', inplace=True)
             df.drop('Date', axis=1, inplace=True)
             plt.figure(figsize=(12, 10))
             sns.heatmap(df.corr(), annot=False, cmap=plt.cm.Reds)
@@ -95,11 +98,46 @@ class feature_construction:
             df.drop(['MACDs_12_26_9', 'Open', 'High', 'Low', 'Close'], inplace=True)
             self.tables[ticker] = df
 
+    def class_construction(self, time=1, classification=False):
+        for ticker in self.tickers:
+            self.tables[ticker]['label'] = self.tables[ticker]['Adj Close'].shift(-time)
+            self.tables[ticker].dropna(inplace=True)
+            if classification is True:
+                self.tables[ticker]['class'] = self.tables[ticker]['label'] - self.tables[ticker]['Adj Close']
+                self.tables[ticker]['class'][self.tables[ticker]['class'] >= 0] = 1
+                self.tables[ticker]['class'][self.tables[ticker]['class'] < 0] = 0
+                self.tables[ticker]['label'] = self.tables[ticker]['class']
+                self.tables[ticker].drop(columns=['class'], inplace=True)
+
+    def scale_variables(self, classification=False):
+        for ticker in self.tickers:
+            x_scaler = MinMaxScaler()
+
+            y = self.tables[ticker]['label']
+            x = self.tables[ticker].drop(columns=['label', 'outlier'])
+
+            x_columns = x.columns.values.tolist()
+            x_scaler.fit_transform(x)
+            self.tables[ticker][x_columns] = x
+
+            if classification is False:
+                y_scaler = MinMaxScaler()
+
+                y_columns = y.columns.values.tolist()
+                y_scaler.fit_transform(y)
+                self.tables[ticker][y_columns] = y
+
+
+
+
+
+
 if __name__ == '__main__':
-    tables = {}
     tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
-    for ticker in tickers:
-        tables[ticker] = pd.read_csv('data/ftse100/' + ticker + '.csv')
+    pre_processing = pre_processing(tickers)
+    pre_processing.perform_preprocessing()
+
+    tables = pre_processing.tables
 
     construct_features = feature_construction(tables)
     construct_features.process_indicators()
@@ -107,3 +145,5 @@ if __name__ == '__main__':
 
     construct_features.tables = tables
     construct_features.final_features()
+    construct_features.class_construction()
+    construct_features.scale_variables()

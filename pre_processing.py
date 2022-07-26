@@ -76,6 +76,7 @@ class pre_processing:
 
     def compare_outlier_detection(self, contamination=0.05):
         for ticker in self.tickers:
+            self.tables[ticker].dropna(inplace=True)
             np.random.seed(42)
             clf = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
             y_pred = clf.fit_predict(self.tables[ticker][self.continuous_features])
@@ -89,22 +90,48 @@ class pre_processing:
             preds = clf.fit_predict(self.tables[ticker][self.continuous_features])
             self.tables[ticker]['isof'] = preds.tolist()
             major_outliers = self.tables[ticker].query('lof==-1 and isof==-1 and dbscan==-1')
-            major_outliers.to_csv('data/generated/outliers/' + ticker + '_major_outliers.csv')
+            # major_outliers.to_csv('data/generated/outliers/' + ticker + '_major_outliers.csv')
             minor_outliers = self.tables[ticker].query(
                 '(lof==-1 and isof==-1 and dbscan!=-1) or '
                 '(lof==-1 and isof!=-1 and dbscan==-1) or '
                 '(lof!=-1 and isof==-1 and dbscan==-1)'
             )
-            minor_outliers.to_csv('data/generated/outliers/' + ticker + '_minor_outliers.csv')
+            # minor_outliers.to_csv('data/generated/outliers/' + ticker + '_minor_outliers.csv')
             print(list(major_outliers.index))
             self.tables[ticker]['outlier'] = 0
             self.tables[ticker].loc[list(major_outliers.index), 'outlier'] = 1
             self.tables[ticker].drop(columns=['lof', 'isof', 'dbscan'], inplace=True)
-            self.tables[ticker].to_csv('data/generated/outliers/' + ticker + '_outliers.csv')
+            # self.tables[ticker].to_csv('data/generated/outliers/' + ticker + '_outliers.csv')
 
-    def variable_scaling(self):
-        print()
+    def find_number_of_certain_outliers(self, contamination=0.05):
+        x = []
+        y = []
+        for ticker in self.tickers:
+            self.tables[ticker].dropna(inplace=True)
+            np.random.seed(42)
+            clf = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
+            y_pred = clf.fit_predict(self.tables[ticker][self.continuous_features])
+            self.tables[ticker]['lof'] = y_pred.tolist()
 
+            outlier_detection = DBSCAN(min_samples=8, eps=40000)
+            clusters = outlier_detection.fit_predict(self.tables[ticker][self.continuous_features])
+            self.tables[ticker]['dbscan'] = clusters.tolist()
+
+            clf = IsolationForest(random_state=1, contamination=contamination)
+            preds = clf.fit_predict(self.tables[ticker][self.continuous_features])
+            self.tables[ticker]['isof'] = preds.tolist()
+            major_outliers = self.tables[ticker].query('lof==-1 and isof==-1 and dbscan==-1')
+            x.append(ticker)
+            y.append(major_outliers.shape[0])
+            # print(ticker + '_outliers=' + str(major_outliers.shape[0]))
+
+        y_pos = np.arange(len(x))
+        plt.bar(y_pos, y)
+        plt.xticks(y_pos, x, rotation=45)
+        plt.xlabel('Ticker')
+        plt.ylabel('Certain Outliers')
+        plt.title('Outlier Found For Each Stock')
+        plt.show()
 
     def perform_preprocessing(self, contamination=0.05):
         for ticker in self.tickers:
@@ -137,8 +164,11 @@ class pre_processing:
 
 
 
+
+
 if __name__ == '__main__':
     tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
-    pre_processing = pre_processing([tickers[0]])
+    pre_processing = pre_processing(tickers)
     # pre_processing.plot_outlier_detection()
-    pre_processing.compare_outlier_detection()
+    # pre_processing.compare_outlier_detection()
+    # pre_processing.find_number_of_certain_outliers()
