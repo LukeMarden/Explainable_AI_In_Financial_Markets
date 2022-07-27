@@ -39,11 +39,14 @@ class feature_construction:
         self.tables = tables
         self.tickers = list(self.tables.keys())
 
+        for ticker in self.tickers:
+            self.tables[ticker].set_index('Date', drop=True, inplace=True)
+
     def process_indicators(self):
 
         for ticker in self.tickers:
             df = self.tables[ticker]
-            df.set_index(pd.DatetimeIndex(df["Date"]), inplace=True)
+            # df.set_index(pd.DatetimeIndex(df["Date"]), inplace=True)
 
             mystrat = ta.Strategy(
                 name='first',
@@ -79,7 +82,6 @@ class feature_construction:
     def final_features(self):
         for ticker in self.tickers:
             df = self.tables[ticker]
-            df.set_index(pd.DatetimeIndex(df["Date"]), inplace=True)
 
             mystrat = ta.Strategy(
                 name='first',
@@ -95,7 +97,7 @@ class feature_construction:
             )
             df.ta.strategy(mystrat)
             df.dropna(inplace=True)
-            df.drop(['MACDs_12_26_9', 'Open', 'High', 'Low', 'Close'], inplace=True)
+            df.drop(columns=['MACDs_12_26_9', 'Open', 'High', 'Low', 'Close'], inplace=True)
             self.tables[ticker] = df
 
     def class_construction(self, time=1, classification=False):
@@ -109,23 +111,42 @@ class feature_construction:
                 self.tables[ticker]['label'] = self.tables[ticker]['class']
                 self.tables[ticker].drop(columns=['class'], inplace=True)
 
+    def show_scaling(self, ticker, classification=False):
+
+        pd.set_option('display.max_columns', len(self.tables[ticker].columns))
+        print('Before:')
+        print(self.tables[ticker].head)
+        x_scaler = MinMaxScaler()
+        y = self.tables[ticker]['label']
+        x = self.tables[ticker].drop(columns=['label', 'outlier'])
+
+        x_columns = x.columns.values.tolist()
+        x = x_scaler.fit_transform(x)
+        self.tables[ticker][x_columns] = x
+
+        if classification is False:
+            y_scaler = MinMaxScaler()
+
+            y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+            self.tables[ticker]['label'] = y
+
+        print('After:')
+        print(self.tables[ticker].head)
+
     def scale_variables(self, classification=False):
         for ticker in self.tickers:
             x_scaler = MinMaxScaler()
-
             y = self.tables[ticker]['label']
             x = self.tables[ticker].drop(columns=['label', 'outlier'])
 
             x_columns = x.columns.values.tolist()
-            x_scaler.fit_transform(x)
+            x = x_scaler.fit_transform(x)
             self.tables[ticker][x_columns] = x
 
             if classification is False:
                 y_scaler = MinMaxScaler()
-
-                y_columns = y.columns.values.tolist()
-                y_scaler.fit_transform(y)
-                self.tables[ticker][y_columns] = y
+                y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+                self.tables[ticker]['label'] = y
 
 
 
@@ -133,17 +154,18 @@ class feature_construction:
 
 
 if __name__ == '__main__':
-    tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
+    tickers = ['AZN.L']#['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
     pre_processing = pre_processing(tickers)
     pre_processing.perform_preprocessing()
 
     tables = pre_processing.tables
 
-    construct_features = feature_construction(tables)
-    construct_features.process_indicators()
-    construct_features.show_correlation()
+    # construct_features = feature_construction(tables)
+    # construct_features.process_indicators()
+    # construct_features.show_correlation()
 
-    construct_features.tables = tables
+    construct_features = feature_construction(tables)
     construct_features.final_features()
     construct_features.class_construction()
-    construct_features.scale_variables()
+    # construct_features.scale_variables()
+    construct_features.show_scaling(ticker='AZN.L')
