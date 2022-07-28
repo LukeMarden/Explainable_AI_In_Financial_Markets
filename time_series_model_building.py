@@ -1,6 +1,8 @@
 from feature_construction import *
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller, kpss
+from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
 import numpy as np
+import seaborn as sns
 class time_series_model_building:
 
     def __init__(self, tables):
@@ -74,8 +76,10 @@ class time_series_model_building:
         x_stationary_features = ['Adj Close', 'SMA_14', 'EMA_14', 'BBL_14_2.0', 'BBM_14_2.0', 'BBU_14_2.0']
         for ticker in self.tickers:
             x_to_transform = self.train_X[ticker][x_stationary_features]
-            self.train_X[ticker][x_stationary_features] = x_to_transform.diff().dropna()
-            self.train_Y[ticker] = self.train_Y[ticker].diff().dropna()
+            self.train_X[ticker][x_stationary_features] = x_to_transform.diff()
+            self.train_X[ticker].dropna(inplace=True)
+            self.train_Y[ticker] = self.train_Y[ticker].diff()
+            self.train_Y[ticker].dropna(inplace=True)
 
     def check_transformed_stationarity(self, univariate=False):
         if univariate is True:
@@ -93,12 +97,6 @@ class time_series_model_building:
                     print('lags = ' + str(adf_results[2]))
                     print('critical points = ' + str(adf_results[4]))
 
-
-
-
-
-
-
     def check_causality(self):
         for ticker in self.tickers:
             #code as per: https://github.com/susanli2016/Machine-Learning-with-Python/blob/master/Granger%20Causality%20Test.ipynb
@@ -115,10 +113,26 @@ class time_series_model_building:
                     df.loc[r, c] = min_p_value
             df.columns = [var + '_x' for var in variables]
             df.index = [var + '_y' for var in variables]
-            print(df)
+
+            sns.heatmap(df)
+            plt.savefig(('plots/' + ticker + '_causality_matrix.png'), bbox_inches='tight')
 
 
 
+    def find_arima_p(self):
+        for ticker in self.tickers:
+            y = self.train_Y[ticker]
+            plot_pacf(y)
+            plt.title(ticker + '_pacf')
+            plt.show()
+
+
+    def find_arima_q(self):
+        for ticker in self.tickers:
+            y = self.train_Y[ticker]
+            plot_acf(y, lags=300)
+            plt.title(ticker + '_acf')
+            plt.show()
 
     def test_arima(self):
         print()
@@ -131,7 +145,7 @@ class time_series_model_building:
 
 
 if __name__ == '__main__':
-    tickers = ['AZN.L']#['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
+    tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
     # pre_processing = pre_processing(tickers)
     # pre_processing.perform_preprocessing()
     #
@@ -143,18 +157,23 @@ if __name__ == '__main__':
     # construct_features.scale_variables()
     #
     # # feature_tables = construct_features.tables
-    # np.save('AZN_feature_table.npy', construct_features.tables)
+    # np.save('feature_tables.npy', construct_features.tables)
 
-    feature_tables = np.load('AZN_feature_table.npy', allow_pickle='TRUE').item()
+    feature_tables = np.load('feature_tables.npy', allow_pickle='TRUE').item()
 
     model_building = time_series_model_building(feature_tables)
+    model_building.tickers = tickers
     # model_building.plot_data()
     # model_building.check_stationarity()
     model_building.split_data()
+    # model_building.find_arima_p()
+    # model_building.find_arima_q()
     # model_building.plot_stationarity_transform()
     model_building.perform_stationarity_transform()
     # model_building.check_transformed_stationarity()
-    model_building.check_causality()
+    # model_building.check_causality()
+
+
 
 
 
