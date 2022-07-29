@@ -4,9 +4,15 @@ from matplotlib import pyplot
 from feature_construction import *
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller, kpss
 from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
+
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, Dropout, InputLayer
+from keras.callbacks import ModelCheckpoint
+from keras.losses import MeanSquaredError
+from keras.metrics import RootMeanSquaredError
+from keras.optimizers import Adam
+from keras.models import load_model
+
 
 import numpy as np
 import seaborn as sns
@@ -23,21 +29,49 @@ class time_series_model_building:
         self.tickers = list(self.tables.keys())
         self.train_X = {}
         self.train_Y = {}
+        self.val_X = {}
+        self.val_Y = {}
         self.test_X = {}
         self.test_Y = {}
 
-    def split_data(self, test_size=30):
+    def split_data(self, future_days, past_days, test_size=30):
         for ticker in self.tickers:
+            self.tables[ticker].drop(columns=['label', 'outlier'], inplace=True)
+            num_of_features = len(self.tables[ticker].columns)
+            train_X = []
+            train_Y = []
+            for i in range(past_days, len(self.tables[ticker]) - future_days + 1):
+                train_X.append(self.tables[ticker].iloc[i - past_days:i, 0:num_of_features])
+                train_Y.append(self.tables[ticker].iloc[i + future_days: - 1:i + future_days, 0])
 
-            train = self.tables[ticker][0:-test_size]
-            test = self.tables[ticker][-test_size:]
-            train.drop(train[train['outlier'] == 1].index, inplace=True)
+            train_X, train_Y = np.array(train_X), np.array(train_Y)
 
-            self.train_Y[ticker] = train['label']
-            self.test_Y[ticker] = test['label']
+            print('total x = ' + str(train_X.shape))
+            print('total y = ' + str(train_Y.shape))
 
-            self.train_X[ticker] = train.drop(columns=['label', 'outlier'])
-            self.test_X[ticker] = test.drop(columns=['label', 'outlier'])
+            self.train_X[ticker], self.train_Y[ticker] = train_X[:1735], train_Y[:1735]
+            self.val_X[ticker], self.val_Y[ticker] = train_X[1735:1983], train_Y[1735:1983]
+            self.test_X[ticker], self.test_Y[ticker] = train_X[1983:], train_Y[1983:]
+            print('train x = ' + str(self.train_X[ticker].shape))
+            print('train y = ' + str(self.train_Y[ticker].shape))
+            print('val x = ' + str(self.val_X[ticker].shape))
+            print('val y = ' + str(self.val_Y[ticker].shape))
+            print('test x = ' + str(self.test_X[ticker].shape))
+            print('test y = ' + str(self.test_Y[ticker].shape))
+
+
+            # test_X = train_X[360:, 0:13, 0:17]
+            # print(test_X.shape)
+
+            # train = self.tables[ticker][0:-test_size]
+            # test = self.tables[ticker][-test_size:]
+            # train.drop(train[train['outlier'] == 1].index, inplace=True)
+            #
+            # self.train_Y[ticker] = train['label']
+            # self.test_Y[ticker] = test['label']
+            #
+            # self.train_X[ticker] = train.drop(columns=['label', 'outlier'])
+            # self.test_X[ticker] = test.drop(columns=['label', 'outlier'])
 
     def plot_data(self):
         for ticker in self.tickers:
@@ -153,35 +187,33 @@ class time_series_model_building:
         for ticker in self.tickers:
             print()
 
-    def test_ltsm(self):
+    def test_lstm(self):
         epoch_number = 50
         batch_size = 64
+        neurons = 50
         for ticker in self.tickers:
-            # (num_of_rows, timestamps_per_row, num_of_features)
-            train_X = self.train_X[ticker].reshape((self.train_X[ticker].shape[0], 1, self.train_X[ticker].shape[1]))
-            test_X = self.test_X[ticker].reshape((self.test_X[ticker].shape[0], 1, self.test_X[ticker].shape[1]))
+            # (num_of_rows, timestamps_per_row/how many previous days to consider, num_of_features)
+            model = Sequential()
+            model.add(LSTM(64, activation='relu', input_shape=(self.train_X[ticker].shape[1], self.train_X[ticker].shape[2]), return_sequences=True))
+            model.add(LSTM(32, activation='relu', return_sequences=False))
+            model.add(Dropout(0.2))
+            model.add(Dense(self.train_Y[ticker].shape[1]))
 
-            model = keras.Sequential()
-            model.add(layers.LSTM(epoch_number, input_shape=(train_X.shape[1], train_X.shape[2])))
-            model.add(layers.BatchNormalization())
-            model.add(layers.Dense(1))
+            print(model.summary())
 
-            history = model.fit(train_X, self.train_Y[ticker], epochs=epoch_number, batch_size=batch_size,
-                                validation_data=(test_X, self.test_Y[ticker]), verbose=2, shuffle=False)
+            cp = ModelCheckpoint('ltsm_models/', save_best_only=True)
+            model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.0001), metrics=[RootMeanSquaredError()])
 
-            pyplot.plot(history.history['loss'], label='train')
-            pyplot.plot(history.history['val_loss'], label='test')
-            pyplot.legend()
-            pyplot.show()
+            model.fit(self.train_X[ticker], self.train_Y[ticker], validation_data=(self.val_X[ticker], self.val_Y[ticker]), epochs=epoch_number, callbacks=[cp])
 
-            predictions = model.predict(test_X)
-
-            print(predictions[0])
+            train_predictions = model.predict(self.train_X[ticker]).flatten()
+            training_results = pd.DataFrame(data={'predictions': train_predictions, 'actual': self.train_Y[ticker]})
+            print(training_results)
 
 
 
 if __name__ == '__main__':
-    tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
+    tickers = ['AZN.L'] #['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
     # pre_processing = pre_processing(tickers)
     # pre_processing.perform_preprocessing()
     #
@@ -201,11 +233,11 @@ if __name__ == '__main__':
     model_building.tickers = tickers
     # model_building.plot_data()
     # model_building.check_stationarity()
-    model_building.split_data()
+    model_building.split_data(1, 14)
     # model_building.find_arima_p()
     # model_building.find_arima_q()
     # model_building.plot_stationarity_transform()
-    model_building.perform_stationarity_transform()
+    # model_building.perform_stationarity_transform()
     # model_building.check_transformed_stationarity()
     # model_building.check_causality()
 
