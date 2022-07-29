@@ -1,8 +1,21 @@
+from keras.utils import data_utils
+from matplotlib import pyplot
+
 from feature_construction import *
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller, kpss
 from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
 import numpy as np
 import seaborn as sns
+import torch
+import torch.nn as nn
+import warnings
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
 class time_series_model_building:
 
     def __init__(self, tables):
@@ -117,15 +130,12 @@ class time_series_model_building:
             sns.heatmap(df)
             plt.savefig(('plots/' + ticker + '_causality_matrix.png'), bbox_inches='tight')
 
-
-
     def find_arima_p(self):
         for ticker in self.tickers:
             y = self.train_Y[ticker]
             plot_pacf(y)
             plt.title(ticker + '_pacf')
             plt.show()
-
 
     def find_arima_q(self):
         for ticker in self.tickers:
@@ -135,13 +145,39 @@ class time_series_model_building:
             plt.show()
 
     def test_arima(self):
-        print()
+        warnings.filterwarnings("ignore")
+        for ticker in self.tickers:
+            print()
 
     def test_var(self):
-        print()
+        for ticker in self.tickers:
+            print()
 
     def test_ltsm(self):
-        print()
+        epoch_number = 50
+        batch_size = 64
+        for ticker in self.tickers:
+            # (num_of_rows, timestamps_per_row, num_of_features)
+            train_X = self.train_X[ticker].reshape((self.train_X[ticker].shape[0], 1, self.train_X[ticker].shape[1]))
+            test_X = self.test_X[ticker].reshape((self.test_X[ticker].shape[0], 1, self.test_X[ticker].shape[1]))
+
+            model = keras.Sequential()
+            model.add(layers.LSTM(epoch_number, input_shape=(train_X.shape[1], train_X.shape[2])))
+            model.add(layers.BatchNormalization())
+            model.add(layers.Dense(1))
+
+            history = model.fit(train_X, self.train_Y[ticker], epochs=epoch_number, batch_size=batch_size,
+                                validation_data=(test_X, self.test_Y[ticker]), verbose=2, shuffle=False)
+
+            pyplot.plot(history.history['loss'], label='train')
+            pyplot.plot(history.history['val_loss'], label='test')
+            pyplot.legend()
+            pyplot.show()
+
+            predictions = model.predict(test_X)
+
+            print(predictions[0])
+
 
 
 if __name__ == '__main__':
