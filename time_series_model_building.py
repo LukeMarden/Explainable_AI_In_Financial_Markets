@@ -13,6 +13,10 @@ from keras.metrics import RootMeanSquaredError
 from keras.optimizers import Adam
 from keras.models import load_model
 
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
 
 import numpy as np
 import seaborn as sns
@@ -49,13 +53,13 @@ class time_series_model_building:
             print('total x = ' + str(train_X.shape))
             print('total y = ' + str(train_Y.shape))
 
-            self.train_X[ticker], self.train_Y[ticker] = train_X[:1735], train_Y[:1735]
-            self.val_X[ticker], self.val_Y[ticker] = train_X[1735:1983], train_Y[1735:1983]
+            self.train_X[ticker], self.train_Y[ticker] = train_X[:1983], train_Y[:1983]
+            # self.val_X[ticker], self.val_Y[ticker] = train_X[1735:1983], train_Y[1735:1983]
             self.test_X[ticker], self.test_Y[ticker] = train_X[1983:], train_Y[1983:]
             print('train x = ' + str(self.train_X[ticker].shape))
             print('train y = ' + str(self.train_Y[ticker].shape))
-            print('val x = ' + str(self.val_X[ticker].shape))
-            print('val y = ' + str(self.val_Y[ticker].shape))
+            # print('val x = ' + str(self.val_X[ticker].shape))
+            # print('val y = ' + str(self.val_Y[ticker].shape))
             print('test x = ' + str(self.test_X[ticker].shape))
             print('test y = ' + str(self.test_Y[ticker].shape))
 
@@ -192,6 +196,8 @@ class time_series_model_building:
         batch_size = 64
         neurons = 50
         for ticker in self.tickers:
+            self.val_X[ticker], self.val_Y[ticker] = self.train_X[ticker][1735:1983], self.train_Y[ticker][1735:1983]
+            self.train_X[ticker], self.train_Y[ticker] = self.train_X[ticker][:1735], self.train_Y[ticker][:1735]
             # (num_of_rows, timestamps_per_row/how many previous days to consider, num_of_features)
             model = Sequential()
             model.add(LSTM(64, activation='relu', input_shape=(self.train_X[ticker].shape[1], self.train_X[ticker].shape[2]), return_sequences=True))
@@ -209,6 +215,18 @@ class time_series_model_building:
             train_predictions = model.predict(self.train_X[ticker]).flatten()
             training_results = pd.DataFrame(data={'predictions': train_predictions, 'actual': self.train_Y[ticker]})
             print(training_results)
+
+    def test_regression(self):
+
+        for ticker in self.tickers:
+            model = DecisionTreeRegressor()
+            param_search = {'max_depth': [3, 5]}
+            cv = TimeSeriesSplit(n_splits=5)
+
+            gsearch = GridSearchCV(estimator=model, cv=cv,
+                                   param_grid=param_search)
+            gsearch.fit(self.train_X[ticker], self.train_Y[ticker])
+
 
 
 
@@ -233,13 +251,14 @@ if __name__ == '__main__':
     model_building.tickers = tickers
     # model_building.plot_data()
     # model_building.check_stationarity()
-    model_building.split_data(1, 14)
     # model_building.find_arima_p()
     # model_building.find_arima_q()
     # model_building.plot_stationarity_transform()
-    # model_building.perform_stationarity_transform()
+    model_building.perform_stationarity_transform()
     # model_building.check_transformed_stationarity()
     # model_building.check_causality()
+    model_building.split_data(1, 14)
+
 
 
 
