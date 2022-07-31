@@ -1,9 +1,13 @@
+import sys
+
 from keras.utils import data_utils
 from matplotlib import pyplot
 
 from feature_construction import *
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller, kpss
 from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
+from statsmodels.tsa.statespace.varmax import VARMAX
+from statsmodels.tsa.api import VAR
 
 import tensorflow as tf
 from keras.models import Sequential
@@ -18,12 +22,18 @@ from keras_preprocessing.sequence import TimeseriesGenerator
 
 from tqdm import tqdm
 
+from pmdarima import auto_arima
 
-
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, train_test_split
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, train_test_split, ParameterGrid
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.metrics import make_scorer, mean_squared_error
+from sklearn.pipeline import Pipeline
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+
 
 import numpy as np
 import seaborn as sns
@@ -238,11 +248,27 @@ class time_series_model_building:
     def test_arima(self):
         warnings.filterwarnings("ignore")
         for ticker in self.tickers:
-            print()
+            print(ticker)
+            table = self.tables[ticker]['Adj Close']
+            fit = auto_arima(table, trace=True, suppress_warnings=True)
+
+    def apply_best_arima(self):
+        print()
 
     def test_var(self):
         for ticker in self.tickers:
-            print()
+            self.tables[ticker].drop(columns=['outlier'], inplace=True)
+            table = self.tables[ticker].astype(float)
+
+            scaler = StandardScaler()
+            scaled_table = scaler.fit_transform(table)
+
+            train, test = train_test_split(scaled_table, test_size=0.2, shuffle=False)
+
+            model = VAR(train)
+            x = model.select_order(maxlags=1)
+            x.summary()
+
 
     def test_lstm(self):
         epoch_number = 50
@@ -250,14 +276,16 @@ class time_series_model_building:
         past_days = 3
         future_days = 1
         for ticker in self.tickers:
-            self.tables[ticker].drop(columns=['label', 'outlier'], inplace=True)
+            self.tables[ticker].drop(columns=['outlier'], inplace=True)
             table = self.tables[ticker].astype(float)
-            num_of_features = table.shape[1]
+            scaler = StandardScaler()
+            scaled_table = scaler.fit_transform(scaler)
+            num_of_features = scaled_table.shape[1]
             table_X = []
             table_Y = []
-            for i in range(past_days, len(table) - future_days + 1):
-                table_X.append(table.iloc[i - past_days:i, 0:num_of_features])
-                table_Y.append(table.iloc[i + future_days - 1:i + future_days, 0])
+            for i in range(past_days, len(scaled_table) - future_days + 1):
+                table_X.append(scaled_table.iloc[i - past_days:i, 0:num_of_features])
+                table_Y.append(scaled_table.iloc[i + future_days - 1:i + future_days, 0])
 
             table_X, table_Y = np.array(table_X), np.array(table_Y)
 
@@ -283,22 +311,105 @@ class time_series_model_building:
             # training_results = pd.DataFrame(data={'predictions': train_predictions, 'actual': self.train_Y[ticker]})
             # print(training_results)
 
-    def test_regression(self):
-
+    def test_regression(self, days_ahead=1):
+        warnings.filterwarnings("ignore")
         for ticker in self.tickers:
-            model = DecisionTreeRegressor()
-            param_search = {'max_depth': [3, 5]}
+            # filename = ticker + '_output.txt'
+            # sys.stdout = open((ticker + '_output.txt'), "w")
+            self.tables[ticker].drop(columns=['outlier'], inplace=True)
+            table = self.tables[ticker].astype(float)
+            table['label'] = table['Adj Close'].shift(-1)
+            table.dropna(inplace=True)
+
+            x = table.drop(columns=['label'])
+            y = table['label']
+
+            x_scaler = StandardScaler()
+            y_scaler = StandardScaler()
+            scaled_x = x_scaler.fit_transform(x)
+            scaled_y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+
+            train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+            train_Y, test_Y = train_test_split(scaled_y, test_size=0.2, shuffle=False)
+
+            classifer_paramameters = [
+                (LinearRegression, {}),
+                (LogisticRegression, {}),
+                (DecisionTreeRegressor, {'max_depth': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, None]}),
+                (RandomForestRegressor, {'max_depth': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, None],
+                                          'max_features': ['auto', 'sqrt'],
+                                          'n_estimators': [200, 400, 600, 800, 1000]})
+            ]
+            classifer_combos = [ctor(**para) for ctor, paras in classifer_paramameters for para in ParameterGrid(paras)]
+            params = dict(
+                transformer=["passthrough"],
+                clf=classifer_combos)
+            process = [("transformer", "passthrough"), ("clf", LinearRegression)]
+            # model = DecisionTreeRegressor()
+            # param_search = {'max_depth': [3, 5]}
             cv = TimeSeriesSplit(n_splits=5)
 
-            gsearch = GridSearchCV(estimator=model, cv=cv,
-                                   param_grid=param_search)
-            gsearch.fit(self.train_X[ticker], self.train_Y[ticker])
+            mse = make_scorer(mean_absolute_error, greater_is_better=False)
+
+            gsearch = GridSearchCV(Pipeline(process), params, cv=cv, verbose=10, scoring=mse)
+            gsearch.fit(train_X, train_Y)
+            print('ticker = ' + ticker)
+            print('score = ' + str(gsearch.score(test_X, test_Y)))
+            print('params = ' + str(gsearch.best_params_))
+
+            # sys.stdout.close()
+
+    def test_classification(self):
+        warnings.filterwarnings("ignore")
+        for ticker in self.tickers:
+            # filename = ticker + '_output.txt'
+            # sys.stdout = open((ticker + '_output.txt'), "w")
+            self.tables[ticker].drop(columns=['outlier'], inplace=True)
+            table = self.tables[ticker].astype(float)
+            table['label'] = tables['Adj Close'] - table['Adj Close'].shift(-1)
+            table['label'][table['label'] >= 0] = 1
+            table['label'][table['label'] < 0] = 0
+            table.dropna(inplace=True)
+
+            x = table.drop(columns=['label'])
+            y = table['label']
+
+            x_scaler = StandardScaler()
+            scaled_x = x_scaler.fit_transform(x)
+
+            train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+            train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
+
+            classifer_paramameters = [
+                (GaussianNB, {}),
+                (SVC, {'C': [1,10, 100], "kernel":['linear', 'poly', 'rbf', 'sigmoid']}),
+                (DecisionTreeClassifier, {'max_depth': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, None]}),
+                (RandomForestClassifier, {'max_depth': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, None],
+                                         'max_features': ['auto', 'sqrt'],
+                                         'n_estimators': [200, 400, 600, 800, 1000]})
+            ]
+            classifer_combos = [ctor(**para) for ctor, paras in classifer_paramameters for para in ParameterGrid(paras)]
+            params = dict(
+                transformer=["passthrough"],
+                clf=classifer_combos)
+            process = [("transformer", "passthrough"), ("clf", LinearRegression)]
+            # model = DecisionTreeRegressor()
+            # param_search = {'max_depth': [3, 5]}
+            cv = TimeSeriesSplit(n_splits=5)
+
+            mse = make_scorer(mean_absolute_error, greater_is_better=False)
+
+            gsearch = GridSearchCV(Pipeline(process), params, cv=cv, verbose=10, scoring=mse)
+            gsearch.fit(train_X, train_Y)
+            print('ticker = ' + ticker)
+            print('score = ' + str(gsearch.score(test_X, test_Y)))
+            print('params = ' + str(gsearch.best_params_))
 
 
 
 
 if __name__ == '__main__':
-    tickers = ['AZN.L'] #['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
+    tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
     # pre_processing = pre_processing(tickers)
     # pre_processing.perform_preprocessing()
     #
@@ -306,8 +417,8 @@ if __name__ == '__main__':
     #
     # construct_features = feature_construction(pre_tables)
     # construct_features.final_features()
-    # construct_features.class_construction()
-    # construct_features.scale_variables()
+    # # construct_features.class_construction()
+    # # construct_features.scale_variables()
     #
     # # feature_tables = construct_features.tables
     # np.save('feature_tables.npy', construct_features.tables)
@@ -327,7 +438,10 @@ if __name__ == '__main__':
     # model_building.split_data2(1, 14)
 
 
-    model_building.test_lstm()
+    # model_building.test_lstm()
+    # model_building.test_regression()
+    # model_building.test_arima()
+    model_building.test_var()
 
 
 

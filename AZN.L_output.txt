@@ -1,0 +1,146 @@
+Fitting 5 folds for each of 123 candidates, totalling 615 fits
+[CV 1/5; 1/123] START clf=LinearRegression(), transformer=passthrough...........
+[CV 1/5; 1/123] END clf=LinearRegression(), transformer=passthrough;, score=-0.380 total time=   0.0s
+[CV 2/5; 1/123] START clf=LinearRegression(), transformer=passthrough...........
+[CV 2/5; 1/123] END clf=LinearRegression(), transformer=passthrough;, score=-0.475 total time=   0.0s
+[CV 3/5; 1/123] START clf=LinearRegression(), transformer=passthrough...........
+[CV 3/5; 1/123] END clf=LinearRegression(), transformer=passthrough;, score=-0.493 total time=   0.0s
+[CV 4/5; 1/123] START clf=LinearRegression(), transformer=passthrough...........
+[CV 4/5; 1/123] END clf=LinearRegression(), transformer=passthrough;, score=-0.543 total time=   0.0s
+[CV 5/5; 1/123] START clf=LinearRegression(), transformer=passthrough...........
+[CV 5/5; 1/123] END clf=LinearRegression(), transformer=passthrough;, score=-0.980 total time=   0.0s
+[CV 1/5; 2/123] START clf=LogisticRegression(), transformer=passthrough.........
+[CV 1/5; 2/123] END clf=LogisticRegression(), transformer=passthrough;, score=nan total time=   0.0s
+[CV 2/5; 2/123] START clf=LogisticRegression(), transformer=passthrough.........
+[CV 2/5; 2/123] END clf=LogisticRegression(), transformer=passthrough;, score=nan total time=   0.0s
+[CV 3/5; 2/123] START clf=LogisticRegression(), transformer=passthrough.........
+[CV 3/5; 2/123] END clf=LogisticRegression(), transformer=passthrough;, score=nan total time=   0.0s
+[CV 4/5; 2/123] START clf=LogisticRegression(), transformer=passthrough.........
+[CV 4/5; 2/123] END clf=LogisticRegression(), transformer=passthrough;, score=nan total time=   0.0s
+[CV 5/5; 2/123] START clf=LogisticRegression(), transformer=passthrough.........
+[CV 5/5; 2/123] END clf=LogisticRegression(), transformer=passthrough;, score=nan total time=   0.0s
+[CV 1/5; 3/123] START clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough
+[CV 1/5; 3/123] END clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough;, score=-0.453 total time=   0.0s
+[CV 2/5; 3/123] START clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough
+[CV 2/5; 3/123] END clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough;, score=-0.617 total time=   0.0s
+[CV 3/5; 3/123] START clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough
+[CV 3/5; 3/123] END clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough;, score=-0.753 total time=   0.0s
+[CV 4/5; 3/123] START clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough
+[CV 4/5; 3/123] END clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough;, score=-0.585 total time=   0.0s
+[CV 5/5; 3/123] START clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough
+[CV 5/5; 3/123] END clf=DecisionTreeRegressor(max_depth=10), transformer=passthrough;, score=-1.134 total time=   0.0s
+[CV 1/5; 4/123] START clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough
+[CV 1/5; 4/123] END clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough;, score=-0.462 total time=   0.0s
+[CV 2/5; 4/123] START clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough
+[CV 2/5; 4/123] END clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough;, score=-0.651 total time=   0.0s
+[CV 3/5; 4/123] START clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough
+[CV 3/5; 4/123] END clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough;, score=-0.872 total time=   0.0s
+[CV 4/5; 4/123] START clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough
+[CV 4/5; 4/123] END clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough;, score=-0.693 total time=   0.0s
+[CV 5/5; 4/123] START clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough
+[CV 5/5; 4/123] END clf=DecisionTreeRegressor(max_depth=20), transformer=passthrough;, score=-1.205 total time=   0.0s
+[CV 1/5; 5/123] START clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough
+[CV 1/5; 5/123] END clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough;, score=-0.446 total time=   0.0s
+[CV 2/5; 5/123] START clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough
+[CV 2/5; 5/123] END clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough;, score=-0.659 total time=   0.0s
+[CV 3/5; 5/123] START clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough
+[CV 3/5; 5/123] END clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough;, score=-0.954 total time=   0.0s
+[CV 4/5; 5/123] START clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough
+[CV 4/5; 5/123] END clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough;, score=-0.694 total time=   0.0s
+[CV 5/5; 5/123] START clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough
+[CV 5/5; 5/123] END clf=DecisionTreeRegressor(max_depth=30), transformer=passthrough;, score=-1.261 total time=   0.0s
+[CV 1/5; 6/123] START clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough
+[CV 1/5; 6/123] END clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough;, score=-0.478 total time=   0.0s
+[CV 2/5; 6/123] START clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough
+[CV 2/5; 6/123] END clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough;, score=-0.673 total time=   0.0s
+[CV 3/5; 6/123] START clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough
+[CV 3/5; 6/123] END clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough;, score=-0.846 total time=   0.0s
+[CV 4/5; 6/123] START clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough
+[CV 4/5; 6/123] END clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough;, score=-0.717 total time=   0.0s
+[CV 5/5; 6/123] START clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough
+[CV 5/5; 6/123] END clf=DecisionTreeRegressor(max_depth=40), transformer=passthrough;, score=-1.212 total time=   0.0s
+[CV 1/5; 7/123] START clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough
+[CV 1/5; 7/123] END clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough;, score=-0.454 total time=   0.0s
+[CV 2/5; 7/123] START clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough
+[CV 2/5; 7/123] END clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough;, score=-0.690 total time=   0.0s
+[CV 3/5; 7/123] START clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough
+[CV 3/5; 7/123] END clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough;, score=-0.872 total time=   0.0s
+[CV 4/5; 7/123] START clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough
+[CV 4/5; 7/123] END clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough;, score=-0.699 total time=   0.0s
+[CV 5/5; 7/123] START clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough
+[CV 5/5; 7/123] END clf=DecisionTreeRegressor(max_depth=50), transformer=passthrough;, score=-1.248 total time=   0.1s
+[CV 1/5; 8/123] START clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough
+[CV 1/5; 8/123] END clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough;, score=-0.490 total time=   0.0s
+[CV 2/5; 8/123] START clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough
+[CV 2/5; 8/123] END clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough;, score=-0.673 total time=   0.0s
+[CV 3/5; 8/123] START clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough
+[CV 3/5; 8/123] END clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough;, score=-0.909 total time=   0.0s
+[CV 4/5; 8/123] START clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough
+[CV 4/5; 8/123] END clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough;, score=-0.690 total time=   0.0s
+[CV 5/5; 8/123] START clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough
+[CV 5/5; 8/123] END clf=DecisionTreeRegressor(max_depth=60), transformer=passthrough;, score=-1.206 total time=   0.1s
+[CV 1/5; 9/123] START clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough
+[CV 1/5; 9/123] END clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough;, score=-0.471 total time=   0.0s
+[CV 2/5; 9/123] START clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough
+[CV 2/5; 9/123] END clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough;, score=-0.669 total time=   0.0s
+[CV 3/5; 9/123] START clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough
+[CV 3/5; 9/123] END clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough;, score=-0.895 total time=   0.0s
+[CV 4/5; 9/123] START clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough
+[CV 4/5; 9/123] END clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough;, score=-0.698 total time=   0.0s
+[CV 5/5; 9/123] START clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough
+[CV 5/5; 9/123] END clf=DecisionTreeRegressor(max_depth=70), transformer=passthrough;, score=-1.232 total time=   0.1s
+[CV 1/5; 10/123] START clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough
+[CV 1/5; 10/123] END clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough;, score=-0.474 total time=   0.0s
+[CV 2/5; 10/123] START clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough
+[CV 2/5; 10/123] END clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough;, score=-0.667 total time=   0.0s
+[CV 3/5; 10/123] START clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough
+[CV 3/5; 10/123] END clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough;, score=-0.880 total time=   0.0s
+[CV 4/5; 10/123] START clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough
+[CV 4/5; 10/123] END clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough;, score=-0.694 total time=   0.0s
+[CV 5/5; 10/123] START clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough
+[CV 5/5; 10/123] END clf=DecisionTreeRegressor(max_depth=80), transformer=passthrough;, score=-1.229 total time=   0.0s
+[CV 1/5; 11/123] START clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough
+[CV 1/5; 11/123] END clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough;, score=-0.489 total time=   0.0s
+[CV 2/5; 11/123] START clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough
+[CV 2/5; 11/123] END clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough;, score=-0.672 total time=   0.0s
+[CV 3/5; 11/123] START clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough
+[CV 3/5; 11/123] END clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough;, score=-0.913 total time=   0.0s
+[CV 4/5; 11/123] START clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough
+[CV 4/5; 11/123] END clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough;, score=-0.700 total time=   0.0s
+[CV 5/5; 11/123] START clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough
+[CV 5/5; 11/123] END clf=DecisionTreeRegressor(max_depth=90), transformer=passthrough;, score=-1.257 total time=   0.0s
+[CV 1/5; 12/123] START clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough
+[CV 1/5; 12/123] END clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough;, score=-0.473 total time=   0.0s
+[CV 2/5; 12/123] START clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough
+[CV 2/5; 12/123] END clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough;, score=-0.667 total time=   0.0s
+[CV 3/5; 12/123] START clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough
+[CV 3/5; 12/123] END clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough;, score=-0.876 total time=   0.1s
+[CV 4/5; 12/123] START clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough
+[CV 4/5; 12/123] END clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough;, score=-0.705 total time=   0.0s
+[CV 5/5; 12/123] START clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough
+[CV 5/5; 12/123] END clf=DecisionTreeRegressor(max_depth=100), transformer=passthrough;, score=-1.218 total time=   0.0s
+[CV 1/5; 13/123] START clf=DecisionTreeRegressor(), transformer=passthrough.....
+[CV 1/5; 13/123] END clf=DecisionTreeRegressor(), transformer=passthrough;, score=-0.478 total time=   0.0s
+[CV 2/5; 13/123] START clf=DecisionTreeRegressor(), transformer=passthrough.....
+[CV 2/5; 13/123] END clf=DecisionTreeRegressor(), transformer=passthrough;, score=-0.684 total time=   0.0s
+[CV 3/5; 13/123] START clf=DecisionTreeRegressor(), transformer=passthrough.....
+[CV 3/5; 13/123] END clf=DecisionTreeRegressor(), transformer=passthrough;, score=-0.929 total time=   0.0s
+[CV 4/5; 13/123] START clf=DecisionTreeRegressor(), transformer=passthrough.....
+[CV 4/5; 13/123] END clf=DecisionTreeRegressor(), transformer=passthrough;, score=-0.719 total time=   0.0s
+[CV 5/5; 13/123] START clf=DecisionTreeRegressor(), transformer=passthrough.....
+[CV 5/5; 13/123] END clf=DecisionTreeRegressor(), transformer=passthrough;, score=-1.268 total time=   0.0s
+[CV 1/5; 14/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough
+[CV 1/5; 14/123] END clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough;, score=-0.383 total time=   0.8s
+[CV 2/5; 14/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough
+[CV 2/5; 14/123] END clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough;, score=-0.477 total time=   1.6s
+[CV 3/5; 14/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough
+[CV 3/5; 14/123] END clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough;, score=-0.503 total time=   2.4s
+[CV 4/5; 14/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough
+[CV 4/5; 14/123] END clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough;, score=-0.537 total time=   2.7s
+[CV 5/5; 14/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough
+[CV 5/5; 14/123] END clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=200), transformer=passthrough;, score=-1.009 total time=   2.7s
+[CV 1/5; 15/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=400), transformer=passthrough
+[CV 1/5; 15/123] END clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=400), transformer=passthrough;, score=-0.379 total time=   1.9s
+[CV 2/5; 15/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=400), transformer=passthrough
+[CV 2/5; 15/123] END clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=400), transformer=passthrough;, score=-0.481 total time=   2.7s
+[CV 3/5; 15/123] START clf=RandomForestRegressor(max_depth=10, max_features='auto', n_estimators=400), transformer=passthrough
