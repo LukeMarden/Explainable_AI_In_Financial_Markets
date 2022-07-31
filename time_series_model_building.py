@@ -5,6 +5,7 @@ from feature_construction import *
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller, kpss
 from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
 
+import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import LSTM, Dense, Dropout, InputLayer
 from keras.callbacks import ModelCheckpoint
@@ -12,11 +13,17 @@ from keras.losses import MeanSquaredError
 from keras.metrics import RootMeanSquaredError
 from keras.optimizers import Adam
 from keras.models import load_model
+from keras_preprocessing.sequence import TimeseriesGenerator
+
+
+from tqdm import tqdm
+
+
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, train_test_split
 
 import numpy as np
 import seaborn as sns
@@ -38,30 +45,36 @@ class time_series_model_building:
         self.test_X = {}
         self.test_Y = {}
 
-    def split_data(self, future_days, past_days, test_size=30):
+    def split_data2(self, future_days, past_days):
         for ticker in self.tickers:
+            # self.tables[ticker].reset_index(inplace=True)
             self.tables[ticker].drop(columns=['label', 'outlier'], inplace=True)
-            num_of_features = len(self.tables[ticker].columns)
-            train_X = []
-            train_Y = []
-            for i in range(past_days, len(self.tables[ticker]) - future_days + 1):
-                train_X.append(self.tables[ticker].iloc[i - past_days:i, 0:num_of_features])
-                train_Y.append(self.tables[ticker].iloc[i + future_days: - 1:i + future_days, 0])
+            table = self.tables[ticker].astype(float)
+            num_of_features = table.shape[1]
+            table_X = []
+            table_Y = []
+            for i in range(past_days, len(table) - future_days + 1):
+                table_X.append(table.iloc[i - past_days:i, 0:num_of_features])
+                table_Y.append(table.iloc[i + future_days - 1:i + future_days, 0])
 
-            train_X, train_Y = np.array(train_X), np.array(train_Y)
+            table_X, table_Y = np.array(table_X), np.array(table_Y)
 
-            print('total x = ' + str(train_X.shape))
-            print('total y = ' + str(train_Y.shape))
+            print('total x = ' + str(table_X.shape))
+            print('total y = ' + str(table_Y.shape))
+            # print(train_X[0])
+            # print(train_Y[0])
 
-            self.train_X[ticker], self.train_Y[ticker] = train_X[:1983], train_Y[:1983]
-            # self.val_X[ticker], self.val_Y[ticker] = train_X[1735:1983], train_Y[1735:1983]
-            self.test_X[ticker], self.test_Y[ticker] = train_X[1983:], train_Y[1983:]
-            print('train x = ' + str(self.train_X[ticker].shape))
-            print('train y = ' + str(self.train_Y[ticker].shape))
-            # print('val x = ' + str(self.val_X[ticker].shape))
-            # print('val y = ' + str(self.val_Y[ticker].shape))
-            print('test x = ' + str(self.test_X[ticker].shape))
-            print('test y = ' + str(self.test_Y[ticker].shape))
+
+
+            # self.train_X[ticker], self.train_Y[ticker] = train_X[:1983], train_Y[:1983]
+            # # self.val_X[ticker], self.val_Y[ticker] = train_X[1735:1983], train_Y[1735:1983]
+            # self.test_X[ticker], self.test_Y[ticker] = train_X[1983:], train_Y[1983:]
+            # print('train x = ' + str(self.train_X[ticker].shape))
+            # print('train y = ' + str(self.train_Y[ticker].shape))
+            # # print('val x = ' + str(self.val_X[ticker].shape))
+            # # print('val y = ' + str(self.val_Y[ticker].shape))
+            # print('test x = ' + str(self.test_X[ticker].shape))
+            # print('test y = ' + str(self.test_Y[ticker].shape))
 
 
             # test_X = train_X[360:, 0:13, 0:17]
@@ -76,6 +89,45 @@ class time_series_model_building:
             #
             # self.train_X[ticker] = train.drop(columns=['label', 'outlier'])
             # self.test_X[ticker] = test.drop(columns=['label', 'outlier'])
+
+    def split_data3(self, past_days):
+        for ticker in self.tickers:
+            sequences = []
+            data_size = len(self.tables[ticker])
+
+            for i in tqdm(range(data_size - past_days)):
+                sequence = self.tables[ticker][i:i+past_days]
+                label_pos = i + past_days
+                label = self.tables[ticker].iloc[label_pos]['label']
+                sequences.append((sequence, label))
+
+            print(sequences[0][0])
+
+    def split_data4(self, past_days):
+        for ticker in self.tickers:
+            target = self.tables[ticker]['label'].to_numpy()
+            table = self.tables[ticker].drop(columns=['label', 'outlier']).to_numpy()
+            train_X, test_X = train_test_split(table, test_size=0.2, shuffle=False)
+            train_Y, test_Y = train_test_split(target, test_size=0.2, shuffle=False)
+            sequence_train = TimeseriesGenerator(train_X, train_Y, length=past_days, batch_size=1)
+            sequence_test = TimeseriesGenerator(test_X, test_Y, length=past_days, batch_size=1)
+
+            batch_0 = sequence_train[0]
+            x, y = batch_0
+            print(x)
+
+    def split_data(self, past_days):
+        for ticker in self.tickers:
+            print(self.tables[ticker].shape)
+            df = self.tables[ticker].drop(columns=['outlier', 'label']) #using adj_close instead of label
+            table = df.to_numpy()
+            x = []
+            y = []
+            print(range(len(table)-past_days))
+            # for i in range(len(table)-past_days):
+                # row = [[a] for a in table[i:i+past_days]]
+                # x.append(row)
+                # label = table[i+past_days]
 
     def plot_data(self):
         for ticker in self.tickers:
@@ -124,13 +176,14 @@ class time_series_model_building:
             plt.show()
 
     def perform_stationarity_transform(self):
-        x_stationary_features = ['Adj Close', 'SMA_14', 'EMA_14', 'BBL_14_2.0', 'BBM_14_2.0', 'BBU_14_2.0']
+        non_stationary_features = ['Adj Close', 'SMA_14', 'EMA_14', 'BBL_14_2.0', 'BBM_14_2.0', 'BBU_14_2.0']
         for ticker in self.tickers:
-            x_to_transform = self.train_X[ticker][x_stationary_features]
-            self.train_X[ticker][x_stationary_features] = x_to_transform.diff()
-            self.train_X[ticker].dropna(inplace=True)
-            self.train_Y[ticker] = self.train_Y[ticker].diff()
-            self.train_Y[ticker].dropna(inplace=True)
+            x_to_transform = self.tables[ticker][non_stationary_features]
+            self.tables[ticker][non_stationary_features] = x_to_transform.diff()
+            self.tables[ticker].dropna(inplace=True)
+            # self.train_Y[ticker] = self.train_Y[ticker].diff()
+            # self.train_Y[ticker].dropna(inplace=True)
+            self.tables[ticker].to_csv('ticker_stationary.csv')
 
     def check_transformed_stationarity(self, univariate=False):
         if univariate is True:
@@ -194,27 +247,41 @@ class time_series_model_building:
     def test_lstm(self):
         epoch_number = 50
         batch_size = 64
-        neurons = 50
+        past_days = 3
+        future_days = 1
         for ticker in self.tickers:
-            self.val_X[ticker], self.val_Y[ticker] = self.train_X[ticker][1735:1983], self.train_Y[ticker][1735:1983]
-            self.train_X[ticker], self.train_Y[ticker] = self.train_X[ticker][:1735], self.train_Y[ticker][:1735]
+            self.tables[ticker].drop(columns=['label', 'outlier'], inplace=True)
+            table = self.tables[ticker].astype(float)
+            num_of_features = table.shape[1]
+            table_X = []
+            table_Y = []
+            for i in range(past_days, len(table) - future_days + 1):
+                table_X.append(table.iloc[i - past_days:i, 0:num_of_features])
+                table_Y.append(table.iloc[i + future_days - 1:i + future_days, 0])
+
+            table_X, table_Y = np.array(table_X), np.array(table_Y)
+
+            train_X, test_X = train_test_split(table_X, test_size=0.2, shuffle=False)
+            train_Y, test_Y = train_test_split(table_Y, test_size=0.2, shuffle=False)
             # (num_of_rows, timestamps_per_row/how many previous days to consider, num_of_features)
             model = Sequential()
-            model.add(LSTM(64, activation='relu', input_shape=(self.train_X[ticker].shape[1], self.train_X[ticker].shape[2]), return_sequences=True))
-            model.add(LSTM(32, activation='relu', return_sequences=False))
+            model.add(LSTM(units=64, input_shape=(train_X.shape[1], train_X.shape[2]), return_sequences=True))
+            model.add(LSTM(units=32, return_sequences=False))
             model.add(Dropout(0.2))
-            model.add(Dense(self.train_Y[ticker].shape[1]))
+            model.add(Dense(train_Y.shape[1]))
 
             print(model.summary())
 
             cp = ModelCheckpoint('ltsm_models/', save_best_only=True)
             model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.0001), metrics=[RootMeanSquaredError()])
 
-            model.fit(self.train_X[ticker], self.train_Y[ticker], validation_data=(self.val_X[ticker], self.val_Y[ticker]), epochs=epoch_number, callbacks=[cp])
+            # self.train_X[ticker] = self.train_X[ticker].reshape((1, self.train_X[ticker].shape[1], self.train_X[ticker].shape[2]))
 
-            train_predictions = model.predict(self.train_X[ticker]).flatten()
-            training_results = pd.DataFrame(data={'predictions': train_predictions, 'actual': self.train_Y[ticker]})
-            print(training_results)
+            history = model.fit(train_X, train_Y, validation_split=0.1, epochs=epoch_number, callbacks=[cp], shuffle=False)
+
+            # train_predictions = model.predict(self.train_X[ticker]).flatten()
+            # training_results = pd.DataFrame(data={'predictions': train_predictions, 'actual': self.train_Y[ticker]})
+            # print(training_results)
 
     def test_regression(self):
 
@@ -257,7 +324,10 @@ if __name__ == '__main__':
     model_building.perform_stationarity_transform()
     # model_building.check_transformed_stationarity()
     # model_building.check_causality()
-    model_building.split_data(1, 14)
+    # model_building.split_data2(1, 14)
+
+
+    model_building.test_lstm()
 
 
 
