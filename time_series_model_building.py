@@ -258,7 +258,7 @@ class time_series_model_building:
     def test_var(self):
         for ticker in self.tickers:
             self.tables[ticker].drop(columns=['outlier'], inplace=True)
-            table = self.tables[ticker].astype(float)
+            table = self.tables[ticker][['Adj Close', 'Volume', 'SMA_14']].astype(float)
 
             scaler = StandardScaler()
             scaled_table = scaler.fit_transform(table)
@@ -266,8 +266,8 @@ class time_series_model_building:
             train, test = train_test_split(scaled_table, test_size=0.2, shuffle=False)
 
             model = VAR(train)
-            x = model.select_order(maxlags=1)
-            x.summary()
+            x = model.select_order(10)
+            print(x.summary())
 
 
     def test_lstm(self):
