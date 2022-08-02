@@ -114,21 +114,23 @@ class time_series_model_building:
             # self.train_Y[ticker].dropna(inplace=True)
             self.tables[ticker].to_csv('ticker_stationary.csv')
 
-    def check_transformed_stationarity(self, univariate=False):
-        if univariate is True:
-            for ticker in self.tickers:
-                x = self.tables[ticker]['Adj Close']
-                y = self.tables[ticker]['label']
-
-        else:
-            for ticker in self.tickers:
-                for column in self.train_X[ticker].columns:
+    def check_transformed_stationarity(self, number_of_transforms=1):
+        for ticker in self.tickers:
+            print(ticker)
+            table = self.tables[ticker]
+            for i in range(number_of_transforms):
+                print('transform = ' + str(i))
+                table = table.diff()
+                table.dropna(inplace=True)
+                for column in table.columns:
                     print(column)
                     adf_results = adfuller(self.train_X[ticker][column])
                     print('ADF = ' + str(adf_results[0]))
                     print('p-value = ' + str(adf_results[1]))
                     print('lags = ' + str(adf_results[2]))
                     print('critical points = ' + str(adf_results[4]))
+                print('\n')
+            print('\n\n\n')
 
     def check_causality(self):
         for ticker in self.tickers:
@@ -224,6 +226,10 @@ class time_series_model_building:
         for ticker in self.tickers:
             table = self.tables[ticker].astype(float)
             table.drop(columns='outlier', inplace=True)
+
+            trans_table = table.diff()
+            trans_table.dropna(inplace=True)
+
             pca = PCA(n_components=5)
             pca_table = pca.fit_transform(table)
 
@@ -532,9 +538,10 @@ if __name__ == '__main__':
     model_building.tickers = tickers
     # model_building.plot_data()
     # model_building.check_stationarity()
-    # model_building.find_arima_p()
+
     # model_building.perform_stationarity_transform()
     model_building.find_arima_q()
+    model_building.find_arima_p()
     # model_building.plot_stationarity_transform()
     # model_building.perform_stationarity_transform()
     # model_building.check_transformed_stationarity()
