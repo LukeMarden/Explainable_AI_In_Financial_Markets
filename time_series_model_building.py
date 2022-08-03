@@ -23,7 +23,6 @@ from keras.losses import MeanSquaredError
 from keras.metrics import RootMeanSquaredError, MeanAbsolutePercentageError, MeanAbsoluteError
 from keras.optimizers import Adam
 from keras.models import load_model
-from keras_preprocessing.sequence import TimeseriesGenerator
 
 from tqdm import tqdm
 
