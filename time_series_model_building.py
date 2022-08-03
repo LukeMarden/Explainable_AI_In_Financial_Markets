@@ -32,7 +32,8 @@ from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, train_test_split, ParameterGrid
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.metrics import make_scorer, mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
+from sklearn.metrics import make_scorer, mean_squared_error, mean_absolute_error, \
+    mean_absolute_percentage_error, classification_report
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
@@ -124,7 +125,7 @@ class time_series_model_building:
                 table.dropna(inplace=True)
                 for column in table.columns:
                     print(column)
-                    adf_results = adfuller(self.train_X[ticker][column])
+                    adf_results = adfuller(table[column])
                     print('ADF = ' + str(adf_results[0]))
                     print('p-value = ' + str(adf_results[1]))
                     print('lags = ' + str(adf_results[2]))
@@ -186,41 +187,118 @@ class time_series_model_building:
         return error
 
     def test_arima_manual(self):
-        p = range(1, 10)
-        q = range(150, 300, 50)
+        p = range(0, 4)
+        q = range(1, 16)
         best_configs = {}
         warnings.filterwarnings("ignore")
         for ticker in self.tickers:
             best_score, best_cfg = float("inf"), None
-            print(ticker)
+            # print(ticker)
             table = self.tables[ticker]['Adj Close']
-            train, test = train_test_split(table, test_size=0.6, shuffle=False)
-            for i in range(len(p)):
-                for j in range(len(q)):
-                    order = (p[i], 0, q[j])
-                    print(str(order))
-                    mse = self.evaluate_arima_model(train, order)
-                    if mse < best_score:
-                        best_score, best_cfg = mse, order
-                    print('ARIMA%s MSE=%.3f' % (order, mse))
+            train, test = train_test_split(table, test_size=0.2, shuffle=False)
+            for i in range(len(q)):
+                for j in range(len(p)):
+                    order = (p[j], 0, q[i])
+                    # print(str(order))
+                    model = ARIMA(train, order=order)
+                    fitted_model = model.fit()
+                    if fitted_model.aic < best_score:
+                        best_score, best_cfg = fitted_model.aic, order
+                    # print((str(fitted_model.aic) + ' & '), end=" ")
+                    # print('ARIMA%s AIC=%.3f' % (order, fitted_model.aic))
+                # print()
             best_configs[ticker] = str((best_cfg, best_score))
-            print('Best ARIMA%s MSE=%.3f' % (best_cfg, best_score))
+            # print('Best ARIMA%s AIC=%.3f' % (best_cfg, best_score))
+            print(ticker + ' & ' + str(best_cfg[0]) + ' & ' + str(best_cfg[2]) + ' & ' + str(best_score))
         print(best_configs)
 
     def test_auto_arima(self):
         for ticker in self.tickers:
             print(ticker)
             table = self.tables[ticker]['Adj Close']
+            table = table.diff()
+            table.dropna(inplace=True)
             train, test = train_test_split(table, test_size=0.2, shuffle=False)
             model = auto_arima(train,
-                               start_p=1, start_q=1, max_p=10, max_q=14,
-                               start_P=1, start_Q=1, max_P=10, max_Q=14,
+                               start_p=1, start_q=1, max_p=3, max_q=15,
+                               start_P=1, start_Q=1, max_P=3, max_Q=15,
                                suppress_warnings=True, error_action='ignore', trace=True)
 
             print(model.summary())
 
     def apply_best_arima(self):
-        print()
+        for ticker in self.tickers:
+            table = self.tables[ticker]['Adj Close']
+            train, test = train_test_split(table, test_size=0.2, shuffle=False)
+            if ticker == 'AZN.L':
+                order = (3, 0, 12)
+            elif ticker == 'SHEL.L':
+                order = (3, 0, 5)
+            elif ticker == 'HSBA.L':
+                order = (1, 0, 1)
+            elif ticker == 'ULVR.L':
+                order = (1, 0, 1)
+            elif ticker == 'DGE.L':
+                order = (3, 0, 15)
+            elif ticker == 'RIO.L':
+                order = (3, 0, 13)
+            elif ticker == 'REL.L':
+                order = (1, 0, 15)
+            elif ticker == 'NG.L':
+                order = (3, 0, 14)
+            elif ticker == 'LSEG.L':
+                order = (1, 0, 15)
+            elif ticker == 'VOD.L':
+                order = (1, 0, 1)
+
+            model = ARIMA(train, order=order)
+            model = model.fit()
+
+
+
+    def difference_in_AIC(self):
+        warnings.filterwarnings("ignore")
+        for ticker in self.tickers:
+            table = self.tables[ticker]['Adj Close']
+            train, test = train_test_split(table, test_size=0.2, shuffle=False)
+            if ticker == 'AZN.L':
+                order1 = (1, 0, 5)
+                order2 = (3, 0, 12)
+            elif ticker == 'SHEL.L':
+                order1 = (1, 0, 2)
+                order2 = (3, 0, 5)
+            elif ticker == 'HSBA.L':
+                order1 = (1, 0, 1)
+                order2 = (1, 0, 1)
+            elif ticker == 'ULVR.L':
+                order1 = (1, 0, 1)
+                order2 = (1, 0, 1)
+            elif ticker == 'DGE.L':
+                order1 = (1, 0, 1)
+                order2 = (3, 0, 15)
+            elif ticker == 'RIO.L':
+                order1 = (1, 0, 13)
+                order2 = (3, 0, 13)
+            elif ticker == 'REL.L':
+                order1 = (1, 0, 6)
+                order2 = (1, 0, 15)
+            elif ticker == 'NG.L':
+                order1 = (1, 0, 3)
+                order2 = (3, 0, 14)
+            elif ticker == 'LSEG.L':
+                order1 = (1, 0, 6)
+                order2 = (1, 0, 15)
+            elif ticker == 'VOD.L':
+                order1 = (1, 0, 6)
+                order2 = (1, 0, 1)
+
+            model1 = ARIMA(train, order=order1)
+            fitted_model1 = model1.fit()
+
+            model2 = ARIMA(train, order=order2)
+            fitted_model2 = model2.fit()
+
+            print('& ' + str(fitted_model2.aic - fitted_model1.aic))
 
     def test_var(self):
         for ticker in self.tickers:
@@ -468,6 +546,59 @@ class time_series_model_building:
         print(found_params)
         np.save('classification_params.npy', found_params)
 
+    def test_best_classification(self, days_ahead=1):
+        found_params = {}
+        warnings.filterwarnings("ignore")
+        for ticker in self.tickers:
+            # filename = ticker + '_output.txt'
+            # sys.stdout = open((ticker + '_output.txt'), "w")
+            # self.tables[ticker].drop(columns=['outlier'], inplace=True)
+            table = self.tables[ticker].astype(float)
+            table.drop(columns=['outlier'], inplace=True)
+            table['label'] = table['Adj Close'].shift(-days_ahead) - table['Adj Close']
+            table['label'][table['label'] >= 0] = 1
+            table['label'][table['label'] < 0] = 0
+            table.dropna(inplace=True)
+
+            x = table.drop(columns=['label'])
+            y = table['label']
+
+            x_scaler = StandardScaler()
+            scaled_x = x_scaler.fit_transform(x)
+
+            train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+            train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
+
+            if ticker == 'AZN.L':
+                model = SVC(C=100, kernel='linear')
+            elif ticker == 'SHEL.L':
+                model = RandomForestClassifier(max_features='auto', n_estimators=600)
+            elif ticker == 'HSBA.L':
+                model = RandomForestClassifier(max_depth=100, max_features='auto', n_estimators=200)
+            elif ticker == 'ULVR.L':
+                model = SVC(C=1, kernel='linear')
+            elif ticker == 'DGE.L':
+                model = RandomForestClassifier(max_depth=60, n_estimators=400)
+            elif ticker == 'RIO.L':
+                model = SVC(C=10, kernel='linear')
+            elif ticker == 'REL.L':
+                model = SVC(C=100, kernel='linear')
+            elif ticker == 'NG.L':
+                model = RandomForestClassifier(max_depth=10, max_features='auto', n_estimators=400)
+            elif ticker == 'LSEG.L':
+                model = RandomForestClassifier(max_depth=10, n_estimators=600)
+            elif ticker == 'VOD.L':
+                model = RandomForestClassifier(max_depth=10, max_features='auto', n_estimators=200)
+            model.fit(train_X, train_Y)
+            pred_Y = model.predict(test_X)
+
+
+
+
+
+
+
+
     def explain_regression(self, ticker, days_ahead=1):
         warnings.filterwarnings("ignore")
         for ticker in self.tickers:
@@ -519,6 +650,7 @@ class time_series_model_building:
 
 if __name__ == '__main__':
     tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
+    # tickers = ['AZN.L']
     # pre_processing = pre_processing(tickers)
     # pre_processing.perform_preprocessing()
     #
@@ -540,8 +672,8 @@ if __name__ == '__main__':
     # model_building.check_stationarity()
 
     # model_building.perform_stationarity_transform()
-    model_building.find_arima_q()
-    model_building.find_arima_p()
+    # model_building.find_arima_q()
+    # model_building.find_arima_p()
     # model_building.plot_stationarity_transform()
     # model_building.perform_stationarity_transform()
     # model_building.check_transformed_stationarity()
@@ -554,6 +686,7 @@ if __name__ == '__main__':
     # model_building.test_classification()
     # model_building.test_auto_arima()
     # model_building.test_arima_manual()
+    model_building.difference_in_AIC()
     # model_building.test_var()
 
     # model_building.test_best_regression()
