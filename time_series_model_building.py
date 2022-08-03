@@ -5,6 +5,8 @@ from matplotlib import pyplot
 
 from explainerdashboard import RegressionExplainer, ClassifierExplainer, ExplainerDashboard
 
+from shap import DeepExplainer
+
 from feature_construction import *
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller, kpss
 from statsmodels.graphics.tsaplots import plot_pacf, plot_acf
@@ -45,7 +47,7 @@ import torch
 import torch.nn as nn
 import warnings
 
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, recall_score, accuracy_score, f1_score, precision_score
 
 class time_series_model_building:
 
@@ -204,12 +206,11 @@ class time_series_model_building:
                     fitted_model = model.fit()
                     if fitted_model.aic < best_score:
                         best_score, best_cfg = fitted_model.aic, order
-                    # print((str(fitted_model.aic) + ' & '), end=" ")
+                    # print((str(round(fitted_model.aic, 2)) + ' & '), end=" ")
                     # print('ARIMA%s AIC=%.3f' % (order, fitted_model.aic))
                 # print()
             best_configs[ticker] = str((best_cfg, best_score))
-            # print('Best ARIMA%s AIC=%.3f' % (best_cfg, best_score))
-            print(ticker + ' & ' + str(best_cfg[0]) + ' & ' + str(best_cfg[2]) + ' & ' + str(best_score))
+            print(ticker + ' & ' + str(best_cfg[0]) + ' & ' + str(best_cfg[2]) + ' & ' + str(round(best_score, 2)))
         print(best_configs)
 
     def test_auto_arima(self):
@@ -227,6 +228,7 @@ class time_series_model_building:
             print(model.summary())
 
     def apply_best_arima(self):
+        warnings.filterwarnings("ignore")
         for ticker in self.tickers:
             table = self.tables[ticker]['Adj Close']
             train, test = train_test_split(table, test_size=0.2, shuffle=False)
@@ -254,7 +256,13 @@ class time_series_model_building:
             model = ARIMA(train, order=order)
             model = model.fit()
 
+            pred = model.forecast(test.shape[0])
+            pred_df = pd.Series(pred.values, index=test.index)
 
+            print(ticker, ' & ', str(round(mean_squared_error(test, pred_df, squared=True), 3)),
+                  ' & ', str(round(mean_squared_error(test, pred_df, squared=False), 2)), ' & ',
+                  str(round(mean_absolute_error(test, pred_df), 3)), ' & ',
+                  str(round(mean_absolute_percentage_error(test, pred_df), 3)))
 
     def difference_in_AIC(self):
         warnings.filterwarnings("ignore")
@@ -298,7 +306,7 @@ class time_series_model_building:
             model2 = ARIMA(train, order=order2)
             fitted_model2 = model2.fit()
 
-            print('& ' + str(fitted_model2.aic - fitted_model1.aic))
+            print('& ' + str(round((fitted_model2.aic - fitted_model1.aic), 3)))
 
     def test_var(self):
         for ticker in self.tickers:
@@ -374,16 +382,17 @@ class time_series_model_building:
             dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
             test_Y = dummy['Adj Close'].values
 
-            metric_string = ticker + ' & ' + str(mean_squared_error(test_Y, pred_Y, squared=True)) \
-                            + ' & ' +  str(mean_squared_error(test_Y, pred_Y, squared=False)) + ' & ' \
-                            + str(mean_absolute_error(test_Y, pred_Y)) + ' & ' \
-                            + str(mean_absolute_percentage_error(test_Y, pred_Y))
+            metric_string = ticker + ' & ' + str(round(mean_squared_error(test_Y, pred_Y, squared=True), 3)) \
+                            + ' & ' + str(round(mean_squared_error(test_Y, pred_Y, squared=False), 3)) + ' & ' \
+                            + str(round(mean_absolute_error(test_Y, pred_Y), 3)) + ' & ' \
+                            + str(round(mean_absolute_percentage_error(test_Y, pred_Y), 3))
             metric_strings[ticker] = metric_string
             # print(ticker, ' & ', str(mean_squared_error(test_Y, pred_Y, squared=True)),
             #       ' & ', str(mean_squared_error(test_Y, pred_Y, squared=False)), ' & ',
             #       str(mean_absolute_error(test_Y, pred_Y)), ' & ',
             #       str(mean_absolute_percentage_error(test_Y, pred_Y)))
-        print(metric_strings)
+        for value in metric_strings.values():
+            print(value)
 
     def load_lstm(self, past_days=3):
         for ticker in self.tickers:
@@ -398,7 +407,7 @@ class time_series_model_building:
             # self.tables[ticker].drop(columns=['outlier'], inplace=True)
             table = self.tables[ticker].astype(float)
             table.drop(columns=['outlier'], inplace=True)
-            table['label'] = table['Adj Close'].shift(-1)
+            table['label'] = table['Adj Close'].shift(-days_ahead)
             table.dropna(inplace=True)
 
             x = table.drop(columns=['label'])
@@ -490,10 +499,23 @@ class time_series_model_building:
             # print("MAE : ", mean_absolute_error(test_Y, pred_Y))
             # print("MAPE : ", mean_absolute_percentage_error(test_Y, pred_Y))
 
-            print(ticker, ' & ', str(mean_squared_error(test_Y, pred_Y, squared=True)),
-                  ' & ', str(mean_squared_error(test_Y, pred_Y, squared=False)), ' & ',
-                  str(mean_absolute_error(test_Y, pred_Y)), ' & ',
-                  str(mean_absolute_percentage_error(test_Y, pred_Y)))
+            print(ticker, ' & ', str(round(mean_squared_error(test_Y, pred_Y, squared=True), 3)),
+                  ' & ', str(round(mean_squared_error(test_Y, pred_Y, squared=False), 3)), ' & ',
+                  str(round(mean_absolute_error(test_Y, pred_Y), 3)), ' & ',
+                  str(round(mean_absolute_percentage_error(test_Y, pred_Y), 3)))
+
+    def find_class_counts(self):
+        for ticker in self.tickers:
+            table = self.tables[ticker].astype(float)
+            table.drop(columns=['outlier'], inplace=True)
+            table['label'] = table['Adj Close'].shift(-1) - table['Adj Close']
+            table['label'][table['label'] >= 0] = 1
+            table['label'][table['label'] < 0] = 0
+            table.dropna(inplace=True)
+
+            y = table['label']
+
+            print(ticker + ' & ' + str(y.value_counts()[0]) + ' & ' + str(y.value_counts()[1]))
 
     def test_classification(self, days_ahead=1):
         found_params = {}
@@ -589,60 +611,86 @@ class time_series_model_building:
                 model = RandomForestClassifier(max_depth=10, n_estimators=600)
             elif ticker == 'VOD.L':
                 model = RandomForestClassifier(max_depth=10, max_features='auto', n_estimators=200)
+
             model.fit(train_X, train_Y)
             pred_Y = model.predict(test_X)
 
+            print(ticker + ' & ' +
+                  str(round(precision_score(test_Y, pred_Y), 3)) + ' & ' +
+                  str(round(recall_score(test_Y, pred_Y), 3)) + ' & ' +
+                  str(round(accuracy_score(test_Y, pred_Y),3)) + ' & ' +
+                  str(round(f1_score(test_Y, pred_Y),3)))
 
-
-
-
-
-
-
-    def explain_regression(self, ticker, days_ahead=1):
+    def explain_regression(self, days_ahead=1):
+        ticker = 'ULVR.L'
         warnings.filterwarnings("ignore")
-        for ticker in self.tickers:
-            table = self.tables[ticker].astype(float)
-            table.drop(columns=['outlier'], inplace=True)
-            table['label'] = table['Adj Close'].shift(-days_ahead)
-            table.dropna(inplace=True)
 
-            x = table.drop(columns=['label'])
-            y = table['label']
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        table['label'] = table['Adj Close'].shift(-days_ahead)
+        table.dropna(inplace=True)
 
-            x_scaler = StandardScaler()
-            y_scaler = StandardScaler()
-            scaled_x = x_scaler.fit_transform(x)
-            scaled_y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+        x = table.drop(columns=['label'])
+        y = table['label']
 
-            train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
-            train_Y, test_Y = train_test_split(scaled_y, test_size=0.2, shuffle=False)
-            model = LinearRegression()
-            if ticker == 'AZN.L':
-                model = RandomForestRegressor(n_estimators=600, max_features='sqrt', max_depth=10)
-            elif ticker == 'SHEL.L':
-                model = LinearRegression()
-            elif ticker == 'HSBA.L':
-                model = LinearRegression()
-            elif ticker == 'ULVR.L':
-                model = LinearRegression()
-            elif ticker == 'DGE.L':
-                model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=800)
-            elif ticker == 'RIO.L':
-                model = LinearRegression()
-            elif ticker == 'REL.L':
-                model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=1000)
-            elif ticker == 'NG.L':
-                model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=800)
-            elif ticker == 'LSEG.L':
-                model = LinearRegression()
-            elif ticker == 'VOD.L':
-                model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=200)
-            model.fit(train_X, train_Y)
-            explainer = RegressionExplainer(model, test_X, test_Y,
-                                            cats=x.columns)
+        x.rename(columns={'BBL_14_2.0': 'BBL_14_2',
+                          'BBM_14_2.0': 'BBM_14_2',
+                          'BBU_14_2.0': 'BBU_14_2',
+                          'BBB_14_2.0': 'BBB_14_2',
+                          'BBP_14_2.0': 'BBP_14_2'}, inplace=True)
 
-            ExplainerDashboard(explainer).run()
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+        scaled_x = x_scaler.fit_transform(x)
+        scaled_y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+
+        scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
+        scaled_y = pd.Series(scaled_y.flatten(), index=y.index, name='label')
+
+        train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(scaled_y, test_size=0.2, shuffle=False)
+
+        model = LinearRegression()
+        model.fit(train_X, train_Y)
+        explainer = RegressionExplainer(model, test_X, test_Y)
+
+        ExplainerDashboard(explainer).run()
+
+    def explain_classification(self, days_ahead=1):
+        ticker = 'ULVR.L'
+        warnings.filterwarnings("ignore")
+
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        table['label'] = table['Adj Close'].shift(-days_ahead) - table['Adj Close']
+        table['label'][table['label'] >= 0] = 1
+        table['label'][table['label'] < 0] = 0
+        table.dropna(inplace=True)
+
+        x = table.drop(columns=['label'])
+        y = table['label']
+
+        x.rename(columns={'BBL_14_2.0': 'BBL_14_2',
+                          'BBM_14_2.0': 'BBM_14_2',
+                          'BBU_14_2.0': 'BBU_14_2',
+                          'BBB_14_2.0': 'BBB_14_2',
+                          'BBP_14_2.0': 'BBP_14_2'}, inplace=True)
+
+        x_scaler = StandardScaler()
+        scaled_x = x_scaler.fit_transform(x)
+
+        scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
+
+        train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
+
+        model = SVC(C=100, kernel='linear')
+        model.fit(train_X, train_Y)
+
+        explainer = ClassifierExplainer(model, test_X, test_Y)
+
+        ExplainerDashboard(explainer).run()
+
 
 
 
@@ -662,14 +710,24 @@ if __name__ == '__main__':
     # # construct_features.scale_variables()
     #
     # # feature_tables = construct_features.tables
+
     # np.save('feature_tables.npy', construct_features.tables)
 
     feature_tables = np.load('feature_tables.npy', allow_pickle='TRUE').item()
+
+    # values = feature_tables['AZN.L'].drop(columns=['outlier'])
+    # feature_tables['AZN.L'] = feature_tables['AZN.L'][feature_tables['AZN.L'][values.columns] != 0]
+
+
+
+
+
 
     model_building = time_series_model_building(feature_tables)
     model_building.tickers = tickers
     # model_building.plot_data()
     # model_building.check_stationarity()
+    # model_building.find_class_counts()
 
     # model_building.perform_stationarity_transform()
     # model_building.find_arima_q()
@@ -678,18 +736,22 @@ if __name__ == '__main__':
     # model_building.perform_stationarity_transform()
     # model_building.check_transformed_stationarity()
     # model_building.check_causality()
-    # print(model_building.tables['AZN.L'])
 
 
-    # model_building.test_lstm()
     # model_building.test_regression()
     # model_building.test_classification()
-    # model_building.test_auto_arima()
+    # # model_building.test_auto_arima()
     # model_building.test_arima_manual()
-    model_building.difference_in_AIC()
+    # model_building.difference_in_AIC()
     # model_building.test_var()
 
+    # model_building.test_lstm()
     # model_building.test_best_regression()
+    # model_building.test_best_classification()
+    # model_building.apply_best_arima()
+
+    # model_building.explain_regression()
+    model_building.explain_classification()
 
 
 
