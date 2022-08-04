@@ -4,6 +4,8 @@ from keras.utils import data_utils
 from matplotlib import pyplot
 
 from explainerdashboard import RegressionExplainer, ClassifierExplainer, ExplainerDashboard
+from shap import KernelExplainer
+import shap
 
 from shap import DeepExplainer
 
@@ -34,7 +36,7 @@ from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, train_test_split, ParameterGrid
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import make_scorer, mean_squared_error, mean_absolute_error, \
-    mean_absolute_percentage_error, classification_report
+    mean_absolute_percentage_error, classification_report, confusion_matrix
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
@@ -620,6 +622,81 @@ class time_series_model_building:
                   str(round(accuracy_score(test_Y, pred_Y),3)) + ' & ' +
                   str(round(f1_score(test_Y, pred_Y),3)))
 
+    def feature_scatter_plots(self, ticker, days_ahead=1):
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        table['label'] = table['Adj Close'].shift(-days_ahead)
+        table.dropna(inplace=True)
+
+        x_columns = table.drop(columns=['label'])
+
+        for column in x_columns:
+            data = table[[column, 'label']]
+            data = data.sort_values(column)
+
+            x_axis = data[column].to_numpy()
+            y_axis = data['label'].to_numpy()
+
+            a, b = np.polyfit(x_axis, y_axis, 1)
+
+            plt.scatter(x_axis, y_axis)
+            plt.plot(x_axis, a * x_axis + b, color='red')
+
+            plt.xlabel(column)
+            plt.ylabel('Future Adjusted Close')
+            plt.title((column + ' vs Future Adjusted Close'))
+
+            plt.savefig(('plots/scatters/' + ticker + '/' + column + '.png'), bbox_inches='tight')
+            plt.clf()
+            # plt.show()
+
+    #Credit: Dr Tahmina Zebin, UEA
+    def make_shap_waterfall_plot(self, shap_values, features, num_display=20):
+
+        '''
+        A function for building a SHAP waterfall plot.
+
+        SHAP waterfall plot is used to visualize the most important features in a descending order.
+
+        Parameters:
+        shap_values (list): SHAP values obtained from a model
+        features (pandas DataFrame): a list of features used in a model
+        num_display(int): number of features to display
+
+        Returns:
+        matplotlib.pyplot plot: SHAP waterfall plot
+
+        '''
+
+        column_list = features.columns
+        feature_ratio = (np.abs(shap_values).sum(0) / np.abs(shap_values).sum()) * 100
+        column_list = column_list[np.argsort(feature_ratio)[::-1]]
+        feature_ratio_order = np.sort(feature_ratio)[::-1]
+        cum_sum = np.cumsum(feature_ratio_order)
+        column_list = column_list[:num_display]
+        feature_ratio_order = feature_ratio_order[:num_display]
+        cum_sum = cum_sum[:num_display]
+
+        num_height = 0
+        if (num_display >= 20) & (len(column_list) >= 20):
+            num_height = (len(column_list) - 20) * 0.4
+
+        fig, ax1 = plt.subplots(figsize=(8, 8 + num_height))
+        ax1.plot(cum_sum[::-1], column_list[::-1], c='blue', marker='o')
+        ax2 = ax1.twiny()
+        ax2.barh(column_list[::-1], feature_ratio_order[::-1], alpha=0.6)
+
+        ax1.grid(True)
+        ax2.grid(False)
+        ax1.set_xticks(np.arange(0, round(cum_sum.max(), -1) + 1, 10))
+        ax2.set_xticks(np.arange(0, round(feature_ratio_order.max(), -1) + 1, 10))
+        ax1.set_xlabel('Cumulative Ratio')
+        ax2.set_xlabel('Composition Ratio')
+        ax1.tick_params(axis="y", labelsize=13)
+        plt.ylim(-1, len(column_list))
+
+        plt.show()
+
     def explain_regression(self, days_ahead=1):
         ticker = 'ULVR.L'
         warnings.filterwarnings("ignore")
@@ -683,12 +760,321 @@ class time_series_model_building:
         train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
         train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
 
-        model = SVC(C=100, kernel='linear')
+        model = SVC(C=100, kernel='linear', probability=True)
         model.fit(train_X, train_Y)
 
-        explainer = ClassifierExplainer(model, test_X, test_Y)
+        train_num_of_samples=100
+        test_num_of_samples=1
 
-        ExplainerDashboard(explainer).run()
+        sampled_train_X = shap.sample(test_X, train_num_of_samples)
+        sampled_test_X = shap.sample(test_X, test_num_of_samples)
+        explainer = KernelExplainer(model.predict_proba, sampled_train_X)
+        shap_values = explainer.shap_values(sampled_test_X)
+
+        # self.make_shap_waterfall_plot(shap_values, test_X)
+
+        shap.summary_plot(shap_values, sampled_test_X)
+        plt.show()
+
+        shap.force_plot(explainer.expected_value, shap_values, sampled_test_X)
+        plt.show()
+
+
+    def test_regression_day_forecasting(self, values=[1, 3, 7, 14, 30, 180]):
+        first_run = True
+        for value in values:
+            ticker = 'ULVR.L'
+            warnings.filterwarnings("ignore")
+
+            table = self.tables[ticker].astype(float)
+            table.drop(columns=['outlier'], inplace=True)
+            table['label'] = table['Adj Close'].shift(-value)
+            table['prediction_date'] = table.index.values
+            table['prediction_date'] = table['prediction_date'].shift(-value)
+            table.dropna(inplace=True)
+
+            x = table.drop(columns=['label', 'prediction_date'])
+            y = pd.Series(data=table['label'].to_numpy(), index=pd.DatetimeIndex(table['prediction_date']))
+
+            x_scaler = StandardScaler()
+            y_scaler = StandardScaler()
+            scaled_x = x_scaler.fit_transform(x)
+            scaled_y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+
+            scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
+            scaled_y = pd.Series(scaled_y.flatten(), index=y.index, name='label')
+
+            train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+            train_Y, test_Y = train_test_split(scaled_y, test_size=0.2, shuffle=False)
+
+            model = LinearRegression()
+            model.fit(train_X, train_Y)
+
+
+
+            if first_run:
+                unscaled_train_Y = y_scaler.inverse_transform(train_Y.to_numpy().reshape(-1, 1))
+                unscaled_test_Y = y_scaler.inverse_transform(test_Y.to_numpy().reshape(-1, 1))
+
+                train_Y = pd.Series(data=unscaled_train_Y.flatten(), index=train_Y.index)
+                test_Y = pd.Series(data=unscaled_test_Y.flatten(), index=test_Y.index)
+
+                plt.plot(train_Y, label='Training', linewidth=1)
+                plt.plot(test_Y, label='Actual', linewidth=1)
+
+                first_run = False
+
+            pred_Y = model.predict(test_X)
+            pred_Y = y_scaler.inverse_transform(pred_Y.reshape(-1, 1))
+            pred_Y = pd.Series(data=pred_Y.flatten(), index=test_Y.index)
+
+            print(str(value) + ' & ' + str(round(mean_squared_error(test_Y, pred_Y, squared=True), 3)),
+                  ' & ', str(round(mean_squared_error(test_Y, pred_Y, squared=False), 3)), ' & ',
+                  str(round(mean_absolute_error(test_Y, pred_Y), 3)), ' & ',
+                  str(round(mean_absolute_percentage_error(test_Y.to_numpy(), pred_Y.to_numpy()), 3)))
+
+            plt.plot(pred_Y, label=(str(value) + ' Day(s) Ahead'), linewidth=0.5)
+        plt.legend(loc="upper left")
+        plt.show()
+
+
+
+    def test_linear_plotting(self, ticker, days_ahead=1):
+        warnings.filterwarnings("ignore")
+
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        table['label'] = table['Adj Close'].shift(-days_ahead)
+        table.dropna(inplace=True)
+
+        x = table.drop(columns=['label'])
+        y = table['label']
+
+        x.rename(columns={'BBL_14_2.0': 'BBL_14_2',
+                          'BBM_14_2.0': 'BBM_14_2',
+                          'BBU_14_2.0': 'BBU_14_2',
+                          'BBB_14_2.0': 'BBB_14_2',
+                          'BBP_14_2.0': 'BBP_14_2'}, inplace=True)
+
+        x_scaler = StandardScaler()
+        y_scaler = StandardScaler()
+        scaled_x = x_scaler.fit_transform(x)
+        scaled_y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+
+        scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
+        scaled_y = pd.Series(scaled_y.flatten(), index=y.index, name='label')
+
+        train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(scaled_y, test_size=0.2, shuffle=False)
+
+
+        model = LinearRegression()
+
+        if ticker == 'AZN.L':
+            model = RandomForestRegressor(n_estimators=600, max_features='sqrt', max_depth=10)
+        elif ticker == 'SHEL.L':
+            model = LinearRegression()
+        elif ticker == 'HSBA.L':
+            model = LinearRegression()
+        elif ticker == 'ULVR.L':
+            model = LinearRegression()
+        elif ticker == 'DGE.L':
+            model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=800)
+        elif ticker == 'RIO.L':
+            model = LinearRegression()
+        elif ticker == 'REL.L':
+            model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=1000)
+        elif ticker == 'NG.L':
+            model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=800)
+        elif ticker == 'LSEG.L':
+            model = LinearRegression()
+        elif ticker == 'VOD.L':
+            model = RandomForestRegressor(max_depth=10, max_features='sqrt', n_estimators=200)
+
+        model.fit(train_X, train_Y)
+
+        pred_Y = model.predict(test_X)
+        pred_Y = y_scaler.inverse_transform(pred_Y.reshape(-1, 1))
+        test_Y = y_scaler.inverse_transform(test_Y.to_numpy().reshape(-1, 1))
+        train_Y = y_scaler.inverse_transform(train_Y.to_numpy().reshape(-1, 1))
+
+        train_Y = pd.Series(data=train_Y.flatten(), index=train_X.index)
+        test_Y = pd.Series(data=test_Y.flatten(), index=test_X.index)
+        pred_Y = pd.Series(data=pred_Y.flatten(), index=test_X.index)
+
+        plt.plot(train_Y, label='Training', linewidth=1)
+        plt.plot(pred_Y, label='Predicted', linewidth=2)
+        plt.plot(test_Y, label='Actual', linewidth=1)
+        plt.xlabel('Date')
+        plt.ylabel('Adj Close')
+        plt.title((ticker + '\'s Simple Regression Model'))
+        plt.legend(loc="upper left")
+        plt.show()
+
+    def test_arima_plotting(self, ticker):
+        warnings.filterwarnings("ignore")
+
+
+        table = self.tables[ticker]['Adj Close']
+        train, test = train_test_split(table, test_size=0.2, shuffle=False)
+
+        if ticker == 'AZN.L':
+            order = (3, 0, 12)
+        elif ticker == 'SHEL.L':
+            order = (3, 0, 5)
+        elif ticker == 'HSBA.L':
+            order = (1, 0, 1)
+        elif ticker == 'ULVR.L':
+            order = (1, 0, 1)
+        elif ticker == 'DGE.L':
+            order = (3, 0, 15)
+        elif ticker == 'RIO.L':
+            order = (3, 0, 13)
+        elif ticker == 'REL.L':
+            order = (1, 0, 15)
+        elif ticker == 'NG.L':
+            order = (3, 0, 14)
+        elif ticker == 'LSEG.L':
+            order = (1, 0, 15)
+        elif ticker == 'VOD.L':
+            order = (1, 0, 1)
+
+        model = ARIMA(train, order=order)
+        model = model.fit()
+
+        pred = model.forecast(test.shape[0])
+        pred_df = pd.Series(pred.values, index=test.index)
+
+        plt.plot(train, label='Training', linewidth=1)
+        plt.plot(pred_df, label='Predicted', linewidth=2)
+        plt.plot(test, label='Actual', linewidth=1)
+        plt.xlabel('Date')
+        plt.ylabel('Adj Close')
+        plt.title((ticker + '\'s ARIMA Model'))
+        plt.legend(loc="upper left")
+        plt.show()
+
+    def test_lstm_plotting(self, ticker, future_days=1, past_days=7, epoch_number=50):
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        scaler = StandardScaler()
+        scaled_table = scaler.fit_transform(table)
+        num_of_features = scaled_table.shape[1]
+        table_X = []
+        table_Y = []
+        for i in range(past_days, len(scaled_table) - future_days + 1):
+            table_X.append(scaled_table[i - past_days:i, 0:num_of_features])
+            table_Y.append(scaled_table[i + future_days - 1:i + future_days, 0])
+
+        table_X, table_Y = np.array(table_X), np.array(table_Y)
+
+        train_X, test_X = train_test_split(table_X, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(table_Y, test_size=0.2, shuffle=False)
+
+        # (num_of_rows, timestamps_per_row/how many previous days to consider, num_of_features)
+        model = Sequential()
+        model.add(LSTM(units=64, input_shape=(train_X.shape[1], train_X.shape[2]), return_sequences=True))
+        model.add(LSTM(units=32, return_sequences=False))
+        model.add(Dropout(0.2))
+        model.add(Dense(train_Y.shape[1]))
+
+        cp = ModelCheckpoint('ltsm_models/', save_best_only=True)
+        model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.0001), metrics=[RootMeanSquaredError()])
+
+        model.fit(train_X, train_Y, validation_split=0.1, epochs=epoch_number, callbacks=[cp], shuffle=False)
+
+        pred_Y = model.predict(test_X)
+
+        dummy = pd.DataFrame(np.zeros((test_X.shape[0], len(table.columns))), columns=table.columns)
+        dummy['Adj Close'] = pred_Y
+        dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
+        pred_Y = pd.Series(dummy['Adj Close'].values, index=test_Y.index)
+
+        dummy = pd.DataFrame(np.zeros((test_X.shape[0], len(table.columns))), columns=table.columns)
+        dummy['Adj Close'] = test_Y
+        dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
+        test_Y = pd.Series(dummy['Adj Close'].values, index=test_Y.index)
+
+        plt.plot(train_Y, label='Training', linewidth=1)
+        plt.plot(pred_Y, label='Predicted', linewidth=2)
+        plt.plot(test_Y, label='Actual', linewidth=1)
+        plt.xlabel('Date')
+        plt.ylabel('Adj Close')
+        plt.title((ticker + '\'s LSTM Model'))
+        plt.legend(loc="upper left")
+        plt.show()
+
+    def test_classification_plotting(self, ticker, days_ahead=1):
+        warnings.filterwarnings("ignore")
+
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        table['label'] = table['Adj Close'].shift(-days_ahead) - table['Adj Close']
+        table['label'][table['label'] >= 0] = 1
+        table['label'][table['label'] < 0] = 0
+        table.dropna(inplace=True)
+
+        x = table.drop(columns=['label'])
+        y = table['label']
+
+        x_scaler = StandardScaler()
+        scaled_x = x_scaler.fit_transform(x)
+
+        train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
+
+        if ticker == 'AZN.L':
+            model = SVC(C=100, kernel='linear')
+        elif ticker == 'SHEL.L':
+            model = RandomForestClassifier(max_features='auto', n_estimators=600)
+        elif ticker == 'HSBA.L':
+            model = RandomForestClassifier(max_depth=100, max_features='auto', n_estimators=200)
+        elif ticker == 'ULVR.L':
+            model = SVC(C=1, kernel='linear')
+        elif ticker == 'DGE.L':
+            model = RandomForestClassifier(max_depth=60, n_estimators=400)
+        elif ticker == 'RIO.L':
+            model = SVC(C=10, kernel='linear')
+        elif ticker == 'REL.L':
+            model = SVC(C=100, kernel='linear')
+        elif ticker == 'NG.L':
+            model = RandomForestClassifier(max_depth=10, max_features='auto', n_estimators=400)
+        elif ticker == 'LSEG.L':
+            model = RandomForestClassifier(max_depth=10, n_estimators=600)
+        elif ticker == 'VOD.L':
+            model = RandomForestClassifier(max_depth=10, max_features='auto', n_estimators=200)
+
+        model.fit(train_X, train_Y)
+        pred_Y = model.predict(test_X)
+
+        cf_matrix = confusion_matrix(train_Y, pred_Y)
+
+        ax = sns.heatmap(cf_matrix, annot=True, cmap='Blues')
+
+        ax.set_title('Seaborn Confusion Matrix with labels\n\n');
+        ax.set_xlabel('\nPredicted Values')
+        ax.set_ylabel('Actual Values ');
+
+        ## Ticket labels - List must be in alphabetical order
+        ax.xaxis.set_ticklabels(['False', 'True'])
+        ax.yaxis.set_ticklabels(['False', 'True'])
+
+        ## Display the visualization of the Confusion Matrix.
+        plt.show()
+
+
+
+
+
+
+
+
+    # def plot_predictions(self, train_Y, test_Y, pred_Y):
+
+
+
+
+
 
 
 
@@ -696,6 +1082,7 @@ class time_series_model_building:
 
 
 if __name__ == '__main__':
+    # shap.initjs()
     tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
     # tickers = ['AZN.L']
     # pre_processing = pre_processing(tickers)
@@ -727,6 +1114,7 @@ if __name__ == '__main__':
     # model_building.plot_data()
     # model_building.check_stationarity()
     # model_building.find_class_counts()
+    # model_building.feature_scatter_plots('ULVR.L')
 
     # model_building.perform_stationarity_transform()
     # model_building.find_arima_q()
@@ -744,13 +1132,26 @@ if __name__ == '__main__':
     # model_building.difference_in_AIC()
     # model_building.test_var()
 
+    # model_building.test_regression_day_forecasting()
+
     # model_building.test_lstm()
     # model_building.test_best_regression()
     # model_building.test_best_classification()
     # model_building.apply_best_arima()
 
+    # model_building.test_linear_plotting('NG.L')
+    # model_building.test_arima_plotting('ULVR.L')
+    # model_building.test_arima_plotting('RIO.L')
+    model_building.test_lstm_plotting('VOD.L')
+    model_building.test_lstm_plotting('LSEG.L')
+
+
+
+
     # model_building.explain_regression()
-    model_building.explain_classification()
+    # model_building.explain_classification()
+
+
 
 
 
