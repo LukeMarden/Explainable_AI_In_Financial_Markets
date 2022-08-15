@@ -1,0 +1,27 @@
+General:
+    abstract - 0.1 day
+	Remove all mentions of rotation forest (not worth the time to implement) - 0.05 days
+	Update Gantt chart - 0.05 days
+Lit Rev: - 0.5 days
+	Mention AIC and other metrics for Arima
+	mention rmse, Mae, and mape
+	Refine recall, precision, f1, accuracy
+Experimentation
+    VAR for aim 1 - 0.5 days
+    Overview of aim 1 - 0.1 days
+	write up EAI - 1 day
+	    shap
+	        implement deep explainer
+            bar and other summary plots
+            general force plots
+            isolated force plots
+	    find most important features of each model type, and isolate to find how values affect
+	Model other days ahead, and lag days for lstm - 0.1 days
+	Aim 3 - isolate years and discuss volatility of markets. Discuss different sectors - 0.5 days
+Conclusion - 1 day
+    Discuss results
+        break down into aims
+        what went well etc
+        surprising results
+    Discuss future work
+    overview of project

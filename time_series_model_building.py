@@ -1,6 +1,6 @@
 import sys
 
-from keras.utils import data_utils
+# from keras.utils import data_utils
 from matplotlib import pyplot
 
 from explainerdashboard import RegressionExplainer, ClassifierExplainer, ExplainerDashboard
@@ -16,15 +16,14 @@ from statsmodels.tsa.statespace.varmax import VARMAX
 from statsmodels.tsa.api import VAR
 from statsmodels.tsa.arima.model import ARIMA
 
-
-import tensorflow as tf
-from keras.models import Sequential, load_model
-from keras.layers import LSTM, Dense, Dropout, InputLayer
-from keras.callbacks import ModelCheckpoint
-from keras.losses import MeanSquaredError
-from keras.metrics import RootMeanSquaredError, MeanAbsolutePercentageError, MeanAbsoluteError
-from keras.optimizers import Adam
-from keras.models import load_model
+from tensorflow import keras
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import LSTM, Dense, Dropout, InputLayer
+from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.losses import MeanSquaredError
+from tensorflow.keras.metrics import RootMeanSquaredError, MeanAbsolutePercentageError, MeanAbsoluteError
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import load_model
 
 from tqdm import tqdm
 
@@ -44,8 +43,6 @@ from sklearn.decomposition import PCA
 
 import numpy as np
 import seaborn as sns
-import torch
-import torch.nn as nn
 import warnings
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, recall_score, accuracy_score, f1_score, precision_score
@@ -327,7 +324,53 @@ class time_series_model_building:
 
             model = VAR(train)
             x = model.select_order(50)
+            print(ticker)
             print(x.summary())
+
+    def test_best_var(self):
+        for ticker in self.tickers:
+            table = self.tables[ticker].astype(float)
+            table.drop(columns='outlier', inplace=True)
+
+            trans_table = table.diff()
+            trans_table.dropna(inplace=True)
+
+            pca = PCA(n_components=5)
+            pca_table = pca.fit_transform(table)
+
+            scaler = StandardScaler()
+            scaled_table = scaler.fit_transform(pca_table)
+
+            train, test = train_test_split(scaled_table, test_size=0.2, shuffle=False)
+
+            model = VAR(train)
+
+            lag = 0
+            if ticker == 'AZN.L':
+                lag = 29
+            elif ticker == 'SHEL.L':
+                lag = 30
+            elif ticker == 'HSBA.L':
+                lag = 16
+            elif ticker == 'ULVR.L':
+                lag = 30
+            elif ticker == 'DGE.L':
+                lag = 29
+            elif ticker == 'RIO.L':
+                lag = 19
+            elif ticker == 'REL.L':
+                lag = 32
+            elif ticker == 'NG.L':
+                lag = 29
+            elif ticker == 'LSEG.L':
+                lag = 38
+            elif ticker == 'VOD.L':
+                lag = 29
+
+            results = model.fit(lag)
+
+
+
 
     def test_lstm(self, past_days=3, future_days=1):
         metric_strings = {}
@@ -763,8 +806,8 @@ class time_series_model_building:
         model = SVC(C=100, kernel='linear', probability=True)
         model.fit(train_X, train_Y)
 
-        train_num_of_samples=100
-        test_num_of_samples=1
+        train_num_of_samples=20
+        test_num_of_samples=10
 
         sampled_train_X = shap.sample(test_X, train_num_of_samples)
         sampled_test_X = shap.sample(test_X, test_num_of_samples)
@@ -776,8 +819,15 @@ class time_series_model_building:
         shap.summary_plot(shap_values, sampled_test_X)
         plt.show()
 
-        shap.force_plot(explainer.expected_value, shap_values, sampled_test_X)
+        shap.force_plot(explainer.expected_value[0], shap_values[0], test_X.iloc[0, :])
         plt.show()
+
+        shap.force_plot(shap_values)
+        plt.show()
+
+        shap.plots.waterfall(shap_values[0])
+        plt.show()
+
 
 
     def test_regression_day_forecasting(self, values=[1, 3, 7, 14, 30, 180]):
@@ -954,7 +1004,9 @@ class time_series_model_building:
         plt.legend(loc="upper left")
         plt.show()
 
-    def test_lstm_plotting(self, ticker, future_days=1, past_days=7, epoch_number=50):
+    def test_lstm_plotting(self, ticker, future_days=1, past_days=7, epoch_number=1):
+        warnings.filterwarnings("ignore")
+
         table = self.tables[ticker].astype(float)
         table.drop(columns=['outlier'], inplace=True)
         scaler = StandardScaler()
@@ -968,6 +1020,8 @@ class time_series_model_building:
 
         table_X, table_Y = np.array(table_X), np.array(table_Y)
 
+        index = table.index
+        train_index, test_index = train_test_split(index, test_size=0.2, shuffle=False)
         train_X, test_X = train_test_split(table_X, test_size=0.2, shuffle=False)
         train_Y, test_Y = train_test_split(table_Y, test_size=0.2, shuffle=False)
 
@@ -988,12 +1042,21 @@ class time_series_model_building:
         dummy = pd.DataFrame(np.zeros((test_X.shape[0], len(table.columns))), columns=table.columns)
         dummy['Adj Close'] = pred_Y
         dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
-        pred_Y = pd.Series(dummy['Adj Close'].values, index=test_Y.index)
+        pred_Y = pd.Series(dummy['Adj Close'].values, index=test_index[:-future_days])
 
         dummy = pd.DataFrame(np.zeros((test_X.shape[0], len(table.columns))), columns=table.columns)
         dummy['Adj Close'] = test_Y
         dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
-        test_Y = pd.Series(dummy['Adj Close'].values, index=test_Y.index)
+        test_Y = pd.Series(dummy['Adj Close'].values, index=test_index[:-future_days])
+
+        dummy = pd.DataFrame(np.zeros((train_X.shape[0], len(table.columns))), columns=table.columns)
+        dummy['Adj Close'] = train_Y
+        dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
+        train_Y = pd.Series(dummy['Adj Close'].values, index=train_index[past_days-future_days:])
+
+
+        print(train_Y)
+        # train_Y = pd.Series(train_Y.flatten(), index=train_index[:-past_days+future_days])
 
         plt.plot(train_Y, label='Training', linewidth=1)
         plt.plot(pred_Y, label='Predicted', linewidth=2)
@@ -1023,6 +1086,7 @@ class time_series_model_building:
         train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
         train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
 
+        model = SVC()
         if ticker == 'AZN.L':
             model = SVC(C=100, kernel='linear')
         elif ticker == 'SHEL.L':
@@ -1047,39 +1111,21 @@ class time_series_model_building:
         model.fit(train_X, train_Y)
         pred_Y = model.predict(test_X)
 
-        cf_matrix = confusion_matrix(train_Y, pred_Y)
+        cf_matrix = confusion_matrix(test_Y, pred_Y)
+
+
+        #credit https://www.stackvidhya.com/plot-confusion-matrix-in-python-and-why/
 
         ax = sns.heatmap(cf_matrix, annot=True, cmap='Blues')
 
-        ax.set_title('Seaborn Confusion Matrix with labels\n\n');
-        ax.set_xlabel('\nPredicted Values')
-        ax.set_ylabel('Actual Values ');
+        ax.set_title('Confusion Matrix of ' + ticker)
+        ax.set_xlabel('Predicted Values')
+        ax.set_ylabel('Actual Values ')
 
-        ## Ticket labels - List must be in alphabetical order
         ax.xaxis.set_ticklabels(['False', 'True'])
         ax.yaxis.set_ticklabels(['False', 'True'])
 
-        ## Display the visualization of the Confusion Matrix.
         plt.show()
-
-
-
-
-
-
-
-
-    # def plot_predictions(self, train_Y, test_Y, pred_Y):
-
-
-
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
     # shap.initjs()
@@ -1104,13 +1150,9 @@ if __name__ == '__main__':
     # values = feature_tables['AZN.L'].drop(columns=['outlier'])
     # feature_tables['AZN.L'] = feature_tables['AZN.L'][feature_tables['AZN.L'][values.columns] != 0]
 
-
-
-
-
-
     model_building = time_series_model_building(feature_tables)
     model_building.tickers = tickers
+
     # model_building.plot_data()
     # model_building.check_stationarity()
     # model_building.find_class_counts()
@@ -1130,7 +1172,7 @@ if __name__ == '__main__':
     # # model_building.test_auto_arima()
     # model_building.test_arima_manual()
     # model_building.difference_in_AIC()
-    # model_building.test_var()
+    model_building.test_var()
 
     # model_building.test_regression_day_forecasting()
 
@@ -1139,14 +1181,14 @@ if __name__ == '__main__':
     # model_building.test_best_classification()
     # model_building.apply_best_arima()
 
+    # model_building.test_linear_plotting('ULVR.L')
     # model_building.test_linear_plotting('NG.L')
     # model_building.test_arima_plotting('ULVR.L')
     # model_building.test_arima_plotting('RIO.L')
-    model_building.test_lstm_plotting('VOD.L')
-    model_building.test_lstm_plotting('LSEG.L')
-
-
-
+    # model_building.test_lstm_plotting('VOD.L')
+    # model_building.test_lstm_plotting('LSEG.L')
+    # model_building.test_classification_plotting('REL.L')
+    # model_building.test_classification_plotting('DGE.L')
 
     # model_building.explain_regression()
     # model_building.explain_classification()
