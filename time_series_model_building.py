@@ -2,7 +2,7 @@ import sys
 
 # from keras.utils import data_utils
 from matplotlib import pyplot
-
+import math
 from explainerdashboard import RegressionExplainer, ClassifierExplainer, ExplainerDashboard
 from shap import KernelExplainer
 import shap
@@ -17,6 +17,7 @@ from statsmodels.tsa.api import VAR
 from statsmodels.tsa.arima.model import ARIMA
 
 from tensorflow import keras
+from tensorflow import get_logger
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, InputLayer
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -386,11 +387,6 @@ class time_series_model_building:
                   ' & ', str(round(mean_squared_error(test, predictions, squared=False), 3)), ' & ',
                   str(round(mean_absolute_error(test, predictions), 3)), ' & ',
                   str(round(mean_absolute_percentage_error(test, predictions), 3)))
-
-
-
-
-
 
     def test_lstm(self, past_days=3, future_days=1):
         metric_strings = {}
@@ -1087,6 +1083,76 @@ class time_series_model_building:
         plt.legend(loc="upper left")
         plt.show()
 
+    def test_lstm_variations(self, ticker, epochs=500, future_predictions=[1,3,7,14,30,100], lags=[3, 7, 14, 30, 50]):
+        warnings.filterwarnings("ignore")
+        strings = []
+        for lag in lags:
+            print('lag = ' + str(lag))
+            string = str(lag)
+            for future_day in future_predictions:
+                print('future_day = ' + str(future_day))
+
+                table = self.tables[ticker].astype(float)
+                table.drop(columns=['outlier'], inplace=True)
+                scaler = StandardScaler()
+                scaled_table = scaler.fit_transform(table)
+                num_of_features = scaled_table.shape[1]
+                table_X = []
+                table_Y = []
+                for i in range(lag, len(scaled_table) - future_day + 1):
+                    table_X.append(scaled_table[i - lag:i, 0:num_of_features])
+                    table_Y.append(scaled_table[i + future_day - 1:i + future_day, 0])
+
+                table_X, table_Y = np.array(table_X), np.array(table_Y)
+
+                index = table.index
+                train_index, test_index = train_test_split(index, test_size=0.2, shuffle=False)
+                train_X, test_X = train_test_split(table_X, test_size=0.2, shuffle=False)
+                train_Y, test_Y = train_test_split(table_Y, test_size=0.2, shuffle=False)
+
+                # (num_of_rows, timestamps_per_row/how many previous days to consider, num_of_features)
+                model = Sequential()
+                model.add(LSTM(units=64, input_shape=(train_X.shape[1], train_X.shape[2]), return_sequences=True))
+                model.add(LSTM(units=32, return_sequences=False))
+                model.add(Dropout(0.2))
+                model.add(Dense(train_Y.shape[1]))
+
+                cp = ModelCheckpoint('ltsm_models/', save_best_only=True)
+                model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.0001),
+                              metrics=[RootMeanSquaredError()])
+
+                model.fit(train_X, train_Y, validation_split=0.1, epochs=epochs, callbacks=[cp], shuffle=False)
+
+                pred_Y = model.predict(test_X)
+
+                dummy = pd.DataFrame(np.zeros((test_X.shape[0], len(table.columns))), columns=table.columns)
+                dummy['Adj Close'] = pred_Y
+                dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
+                pred_Y = dummy['Adj Close'].values
+                # pred_Y = pd.Series(dummy['Adj Close'].values, index=test_index)
+                #
+                dummy = pd.DataFrame(np.zeros((test_X.shape[0], len(table.columns))), columns=table.columns)
+                dummy['Adj Close'] = test_Y
+                dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
+                test_Y = dummy['Adj Close'].values
+                # test_Y = pd.Series(dummy['Adj Close'].values, index=test_index)
+
+                # dummy = pd.DataFrame(np.zeros((train_X.shape[0], len(table.columns))), columns=table.columns)
+                # dummy['Adj Close'] = train_Y
+                # dummy = pd.DataFrame(scaler.inverse_transform(dummy), columns=table.columns)
+                # train_Y = pd.Series(dummy['Adj Close'].values, index=train_index[lag-1:])
+
+                string = string + ' & ' + str(round(mean_absolute_percentage_error(test_Y, pred_Y), 3))
+            string = string + "\\" + "\\" + ' ' + "\\" + 'hline'
+            print(string)
+            strings.append(string)
+        for string in strings:
+            print(string)
+
+
+
+
+
     def test_classification_plotting(self, ticker, days_ahead=1):
         warnings.filterwarnings("ignore")
 
@@ -1194,8 +1260,10 @@ if __name__ == '__main__':
     # model_building.difference_in_AIC()
     # model_building.test_var()
 
+    model_building.test_lstm_variations('VOD.L')
+
     # model_building.test_regression_day_forecasting()
-    model_building.test_best_var()
+    # model_building.test_best_var()
     # model_building.test_lstm()
     # model_building.test_best_regression()
     # model_building.test_best_classification()
@@ -1203,8 +1271,8 @@ if __name__ == '__main__':
 
     # model_building.test_linear_plotting('ULVR.L')
     # model_building.test_linear_plotting('NG.L')
-    model_building.test_arima_plotting('ULVR.L')
-    model_building.test_arima_plotting('RIO.L')
+    # model_building.test_arima_plotting('ULVR.L')
+    # model_building.test_arima_plotting('RIO.L')
     # model_building.test_lstm_plotting('VOD.L')
     # model_building.test_lstm_plotting('LSEG.L')
     # model_building.test_classification_plotting('REL.L')

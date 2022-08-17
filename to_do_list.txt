@@ -1,8 +1,8 @@
 General:
-    abstract - 0.1 day
+    abstract - 0.1 day (last)
 	Update Gantt chart - 0.05 days
 Experimentation
-    Overview of aim 1 - 0.1 days
+    Overview of aim 1 - 0.2 days
 	write up EAI - 1 day
 	    shap
 	        implement deep explainer
