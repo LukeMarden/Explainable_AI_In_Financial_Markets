@@ -169,23 +169,6 @@ class time_series_model_building:
             plt.title(ticker + '_acf')
             plt.show()
 
-    def evaluate_arima_model(self, X, arima_order):
-        # prepare training dataset
-        train_size = int(len(X) * 0.66)
-        train, test = X[0:train_size], X[train_size:]
-        history = [x for x in train]
-        # make predictions
-        predictions = list()
-        for t in range(len(test)):
-            model = ARIMA(history, order=arima_order)
-            model_fit = model.fit()
-            yhat = model_fit.forecast()[0]
-            predictions.append(yhat)
-            history.append(test[t])
-        # calculate out of sample error
-        error = mean_squared_error(test, predictions)
-        return error
-
     def test_arima_manual(self):
         p = range(0, 4)
         q = range(1, 16)
@@ -315,7 +298,7 @@ class time_series_model_building:
             trans_table.dropna(inplace=True)
 
             pca = PCA(n_components=5)
-            pca_table = pca.fit_transform(table)
+            pca_table = pca.fit_transform(trans_table)
 
             scaler = StandardScaler()
             scaled_table = scaler.fit_transform(pca_table)
@@ -332,16 +315,32 @@ class time_series_model_building:
             table = self.tables[ticker].astype(float)
             table.drop(columns='outlier', inplace=True)
 
-            trans_table = table.diff()
-            trans_table.dropna(inplace=True)
+            # trans_table = table.diff()
+            # trans_table.dropna(inplace=True)
 
             pca = PCA(n_components=5)
-            pca_table = pca.fit_transform(table)
+            pca_table = pca.fit_transform(table.drop(columns='Adj Close'))
+            pca_table = np.append(pca_table, np.reshape(table['Adj Close'].to_numpy(), (-1, 1)), axis=1)
+
+            pca_df = pd.DataFrame(data=pca_table, columns=['1', '2', '3', '4', '5', 'Adj Close'], index=table.index)
+
+            train, test = train_test_split(pca_df, test_size=0.2, shuffle=False)
+
+            train = train.diff()
+            train.dropna(inplace=True)
+
+            # for column in pca_df.columns:
+            #     print(column)
+            #     adf_results = adfuller(pca_df[column])
+            #     print('ADF = ' + str(adf_results[0]))
+            #     print('p-value = ' + str(adf_results[1]))
+            #     print('lags = ' + str(adf_results[2]))
+            #     print('critical points = ' + str(adf_results[4]))
 
             scaler = StandardScaler()
-            scaled_table = scaler.fit_transform(pca_table)
+            train = scaler.fit_transform(train)
 
-            train, test = train_test_split(scaled_table, test_size=0.2, shuffle=False)
+            # train, test = train_test_split(scaled_table, test_size=0.2, shuffle=False)
 
             model = VAR(train)
 
@@ -368,6 +367,27 @@ class time_series_model_building:
                 lag = 29
 
             results = model.fit(lag)
+            predictions = results.forecast(train[-lag:], test.shape[0])
+
+            #reverse scaler
+            predictions = scaler.inverse_transform(predictions)
+            train = scaler.inverse_transform(train)
+
+            #isolate adj close
+            predictions = predictions[:, -1]
+            test = test['Adj Close'].to_numpy()
+            train = train[:, -1]
+
+            #reverse diff()
+            train = table['Adj Close'].iloc[0] + train.cumsum()
+            predictions = train[-1] + predictions.cumsum()
+
+            print(ticker, ' & ', str(round(mean_squared_error(test, predictions, squared=True), 3)),
+                  ' & ', str(round(mean_squared_error(test, predictions, squared=False), 3)), ' & ',
+                  str(round(mean_absolute_error(test, predictions), 3)), ' & ',
+                  str(round(mean_absolute_percentage_error(test, predictions), 3)))
+
+
 
 
 
@@ -1172,10 +1192,10 @@ if __name__ == '__main__':
     # # model_building.test_auto_arima()
     # model_building.test_arima_manual()
     # model_building.difference_in_AIC()
-    model_building.test_var()
+    # model_building.test_var()
 
     # model_building.test_regression_day_forecasting()
-
+    model_building.test_best_var()
     # model_building.test_lstm()
     # model_building.test_best_regression()
     # model_building.test_best_classification()
@@ -1183,8 +1203,8 @@ if __name__ == '__main__':
 
     # model_building.test_linear_plotting('ULVR.L')
     # model_building.test_linear_plotting('NG.L')
-    # model_building.test_arima_plotting('ULVR.L')
-    # model_building.test_arima_plotting('RIO.L')
+    model_building.test_arima_plotting('ULVR.L')
+    model_building.test_arima_plotting('RIO.L')
     # model_building.test_lstm_plotting('VOD.L')
     # model_building.test_lstm_plotting('LSEG.L')
     # model_building.test_classification_plotting('REL.L')
