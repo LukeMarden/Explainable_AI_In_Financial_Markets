@@ -1,6 +1,9 @@
+import pickle
 import sys
 
 # from keras.utils import data_utils
+import webbrowser
+
 from matplotlib import pyplot
 import math
 from explainerdashboard import RegressionExplainer, ClassifierExplainer, ExplainerDashboard
@@ -16,8 +19,12 @@ from statsmodels.tsa.statespace.varmax import VARMAX
 from statsmodels.tsa.api import VAR
 from statsmodels.tsa.arima.model import ARIMA
 
+
+# tf.compat.v1.disable_v2_behavior()
 from tensorflow import keras
 from tensorflow import get_logger
+import tensorflow as tf
+tf.compat.v1.disable_v2_behavior()
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, InputLayer
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -53,12 +60,6 @@ class time_series_model_building:
     def __init__(self, tables):
         self.tables = tables
         self.tickers = list(self.tables.keys())
-        self.train_X = {}
-        self.train_Y = {}
-        self.val_X = {}
-        self.val_Y = {}
-        self.test_X = {}
-        self.test_Y = {}
 
     def plot_data(self):
         for ticker in self.tickers:
@@ -421,7 +422,7 @@ class time_series_model_building:
             print(model.summary())
 
             cp = ModelCheckpoint('ltsm_models/', save_best_only=True)
-            model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.0001), metrics=[RootMeanSquaredError()])
+            model.compile(loss=MeanSquaredError(), optimizer='adam', metrics=[RootMeanSquaredError()])
 
             # self.train_X[ticker] = self.train_X[ticker].reshape((1, self.train_X[ticker].shape[1], self.train_X[ticker].shape[2]))
 
@@ -709,143 +710,6 @@ class time_series_model_building:
             plt.clf()
             # plt.show()
 
-    #Credit: Dr Tahmina Zebin, UEA
-    def make_shap_waterfall_plot(self, shap_values, features, num_display=20):
-
-        '''
-        A function for building a SHAP waterfall plot.
-
-        SHAP waterfall plot is used to visualize the most important features in a descending order.
-
-        Parameters:
-        shap_values (list): SHAP values obtained from a model
-        features (pandas DataFrame): a list of features used in a model
-        num_display(int): number of features to display
-
-        Returns:
-        matplotlib.pyplot plot: SHAP waterfall plot
-
-        '''
-
-        column_list = features.columns
-        feature_ratio = (np.abs(shap_values).sum(0) / np.abs(shap_values).sum()) * 100
-        column_list = column_list[np.argsort(feature_ratio)[::-1]]
-        feature_ratio_order = np.sort(feature_ratio)[::-1]
-        cum_sum = np.cumsum(feature_ratio_order)
-        column_list = column_list[:num_display]
-        feature_ratio_order = feature_ratio_order[:num_display]
-        cum_sum = cum_sum[:num_display]
-
-        num_height = 0
-        if (num_display >= 20) & (len(column_list) >= 20):
-            num_height = (len(column_list) - 20) * 0.4
-
-        fig, ax1 = plt.subplots(figsize=(8, 8 + num_height))
-        ax1.plot(cum_sum[::-1], column_list[::-1], c='blue', marker='o')
-        ax2 = ax1.twiny()
-        ax2.barh(column_list[::-1], feature_ratio_order[::-1], alpha=0.6)
-
-        ax1.grid(True)
-        ax2.grid(False)
-        ax1.set_xticks(np.arange(0, round(cum_sum.max(), -1) + 1, 10))
-        ax2.set_xticks(np.arange(0, round(feature_ratio_order.max(), -1) + 1, 10))
-        ax1.set_xlabel('Cumulative Ratio')
-        ax2.set_xlabel('Composition Ratio')
-        ax1.tick_params(axis="y", labelsize=13)
-        plt.ylim(-1, len(column_list))
-
-        plt.show()
-
-    def explain_regression(self, days_ahead=1):
-        ticker = 'ULVR.L'
-        warnings.filterwarnings("ignore")
-
-        table = self.tables[ticker].astype(float)
-        table.drop(columns=['outlier'], inplace=True)
-        table['label'] = table['Adj Close'].shift(-days_ahead)
-        table.dropna(inplace=True)
-
-        x = table.drop(columns=['label'])
-        y = table['label']
-
-        x.rename(columns={'BBL_14_2.0': 'BBL_14_2',
-                          'BBM_14_2.0': 'BBM_14_2',
-                          'BBU_14_2.0': 'BBU_14_2',
-                          'BBB_14_2.0': 'BBB_14_2',
-                          'BBP_14_2.0': 'BBP_14_2'}, inplace=True)
-
-        x_scaler = StandardScaler()
-        y_scaler = StandardScaler()
-        scaled_x = x_scaler.fit_transform(x)
-        scaled_y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
-
-        scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
-        scaled_y = pd.Series(scaled_y.flatten(), index=y.index, name='label')
-
-        train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
-        train_Y, test_Y = train_test_split(scaled_y, test_size=0.2, shuffle=False)
-
-        model = LinearRegression()
-        model.fit(train_X, train_Y)
-        explainer = RegressionExplainer(model, test_X, test_Y)
-
-        ExplainerDashboard(explainer).run()
-
-    def explain_classification(self, days_ahead=1):
-        ticker = 'ULVR.L'
-        warnings.filterwarnings("ignore")
-
-        table = self.tables[ticker].astype(float)
-        table.drop(columns=['outlier'], inplace=True)
-        table['label'] = table['Adj Close'].shift(-days_ahead) - table['Adj Close']
-        table['label'][table['label'] >= 0] = 1
-        table['label'][table['label'] < 0] = 0
-        table.dropna(inplace=True)
-
-        x = table.drop(columns=['label'])
-        y = table['label']
-
-        x.rename(columns={'BBL_14_2.0': 'BBL_14_2',
-                          'BBM_14_2.0': 'BBM_14_2',
-                          'BBU_14_2.0': 'BBU_14_2',
-                          'BBB_14_2.0': 'BBB_14_2',
-                          'BBP_14_2.0': 'BBP_14_2'}, inplace=True)
-
-        x_scaler = StandardScaler()
-        scaled_x = x_scaler.fit_transform(x)
-
-        scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
-
-        train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
-        train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
-
-        model = SVC(C=100, kernel='linear', probability=True)
-        model.fit(train_X, train_Y)
-
-        train_num_of_samples=20
-        test_num_of_samples=10
-
-        sampled_train_X = shap.sample(test_X, train_num_of_samples)
-        sampled_test_X = shap.sample(test_X, test_num_of_samples)
-        explainer = KernelExplainer(model.predict_proba, sampled_train_X)
-        shap_values = explainer.shap_values(sampled_test_X)
-
-        # self.make_shap_waterfall_plot(shap_values, test_X)
-
-        shap.summary_plot(shap_values, sampled_test_X)
-        plt.show()
-
-        shap.force_plot(explainer.expected_value[0], shap_values[0], test_X.iloc[0, :])
-        plt.show()
-
-        shap.force_plot(shap_values)
-        plt.show()
-
-        shap.plots.waterfall(shap_values[0])
-        plt.show()
-
-
-
     def test_regression_day_forecasting(self, values=[1, 3, 7, 14, 30, 180]):
         first_run = True
         for value in values:
@@ -902,8 +766,6 @@ class time_series_model_building:
             plt.plot(pred_Y, label=(str(value) + ' Day(s) Ahead'), linewidth=0.5)
         plt.legend(loc="upper left")
         plt.show()
-
-
 
     def test_linear_plotting(self, ticker, days_ahead=1):
         warnings.filterwarnings("ignore")
@@ -1049,7 +911,7 @@ class time_series_model_building:
         model.add(Dense(train_Y.shape[1]))
 
         cp = ModelCheckpoint('ltsm_models/', save_best_only=True)
-        model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.0001), metrics=[RootMeanSquaredError()])
+        model.compile(loss=MeanSquaredError(), optimizer='adam', metrics=[RootMeanSquaredError()])
 
         model.fit(train_X, train_Y, validation_split=0.1, epochs=epoch_number, callbacks=[cp], shuffle=False)
 
@@ -1083,7 +945,7 @@ class time_series_model_building:
         plt.legend(loc="upper left")
         plt.show()
 
-    def test_lstm_variations(self, ticker, epochs=500, future_predictions=[1,3,7,14,30,100], lags=[3, 7, 14, 30, 50]):
+    def test_lstm_variations(self, ticker, epochs=50, future_predictions=[1,3,7,14,30,100], lags=[3, 7, 14, 30, 50]):
         warnings.filterwarnings("ignore")
         strings = []
         for lag in lags:
@@ -1118,7 +980,7 @@ class time_series_model_building:
                 model.add(Dense(train_Y.shape[1]))
 
                 cp = ModelCheckpoint('ltsm_models/', save_best_only=True)
-                model.compile(loss=MeanSquaredError(), optimizer=Adam(learning_rate=0.0001),
+                model.compile(loss=MeanSquaredError(), optimizer='adam',
                               metrics=[RootMeanSquaredError()])
 
                 model.fit(train_X, train_Y, validation_split=0.1, epochs=epochs, callbacks=[cp], shuffle=False)
@@ -1148,10 +1010,6 @@ class time_series_model_building:
             strings.append(string)
         for string in strings:
             print(string)
-
-
-
-
 
     def test_classification_plotting(self, ticker, days_ahead=1):
         warnings.filterwarnings("ignore")
@@ -1213,6 +1071,230 @@ class time_series_model_building:
 
         plt.show()
 
+    def explain_regression(self, days_ahead=1):
+        ticker = 'ULVR.L'
+        warnings.filterwarnings("ignore")
+
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        table['label'] = table['Adj Close'].shift(-days_ahead)
+        table.dropna(inplace=True)
+
+        x = table.drop(columns=['label'])
+        y = table['label']
+
+        x.rename(columns={'BBL_14_2.0': 'BBL_14_2',
+                          'BBM_14_2.0': 'BBM_14_2',
+                          'BBU_14_2.0': 'BBU_14_2',
+                          'BBB_14_2.0': 'BBB_14_2',
+                          'BBP_14_2.0': 'BBP_14_2'}, inplace=True)
+
+        # x_scaler = StandardScaler()
+        # y_scaler = StandardScaler()
+        # scaled_x = x_scaler.fit_transform(x)
+        # scaled_y = y_scaler.fit_transform(y.to_numpy().reshape(-1, 1))
+        #
+        # scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
+        # scaled_y = pd.Series(scaled_y.flatten(), index=y.index, name='label')
+
+        train_X, test_X = train_test_split(x, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
+
+        model = LinearRegression()
+        model.fit(train_X, train_Y)
+
+        sampled_train_X = shap.utils.sample(train_X, 100)
+
+        explainer = shap.Explainer(model.predict, sampled_train_X)
+        shap_values = explainer(train_X)
+
+        print(shap_values[0])
+
+        shap.plots.waterfall(shap_values[0], max_display=14, show=False)
+        plt.savefig("plots/linear_waterfall_0.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+
+        plt.clf()
+        shap.plots.beeswarm(shap_values, show=False)
+        plt.savefig("plots/linear_beeswarm.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+        # plt.clf()
+        # shap.force_plot(explainer.expected_value, shap_values[0], features=train_X.iloc[0], feature_names=train_X.columns, show=False)
+        # plt.savefig("plots/linear_force_plot_0.png", bbox_inches='tight', dpi=100)
+        # plt.show()
+
+        # plt.clf()
+        # shap.plots.waterfall(shap_values, max_display=14)
+        # plt.show()
+
+        explainer = RegressionExplainer(model, train_X, train_Y)
+
+        ExplainerDashboard(explainer).run()
+
+    def explain_classification(self, days_ahead=1):
+        ticker = 'ULVR.L'
+        warnings.filterwarnings("ignore")
+
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        table['label'] = table['Adj Close'].shift(-days_ahead) - table['Adj Close']
+        table['label'][table['label'] >= 0] = 1
+        table['label'][table['label'] < 0] = 0
+        table.dropna(inplace=True)
+
+        x = table.drop(columns=['label'])
+        y = table['label']
+
+        x.rename(columns={'BBL_14_2.0': 'BBL_14_2',
+                          'BBM_14_2.0': 'BBM_14_2',
+                          'BBU_14_2.0': 'BBU_14_2',
+                          'BBB_14_2.0': 'BBB_14_2',
+                          'BBP_14_2.0': 'BBP_14_2'}, inplace=True)
+
+        x_scaler = StandardScaler()
+        scaled_x = x_scaler.fit_transform(x)
+
+        scaled_x = pd.DataFrame(scaled_x, index=x.index, columns=x.columns)
+
+        train_X, test_X = train_test_split(scaled_x, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(y, test_size=0.2, shuffle=False)
+
+        model = SVC(C=100, kernel='linear', probability=True)
+        model.fit(test_X, test_Y)
+        # #
+        # filename = 'finalized_model.sav'
+        # # pickle.dump(model, open(filename, 'wb'))
+        # #
+        # # print('model saved')
+        # model = pickle.load(open(filename, 'rb'))
+
+        sampled_test_X = shap.utils.sample(test_X, 100)#100
+
+        explainer = shap.Explainer(model.predict, sampled_test_X)
+        shap_values = explainer(test_X)
+
+        # shap_values.values = x_scaler.inverse_transform(shap_values.values)
+        shap.summary_plot(shap_values, test_X, plot_type='bar', show=False)
+        plt.savefig("plots/classification_summary_plot.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+        plt.clf()
+        shap.plots.beeswarm(shap_values, show=False)
+        plt.savefig("plots/classification_beeswarm.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+        plt.clf()
+        shap.plots.waterfall(shap_values[0], max_display=14, show=False)
+        plt.savefig("plots/classification_waterfall_0.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+
+    def explain_lstm(self, past_days=3, future_days=1):
+
+        epoch_number = 1
+        ticker = 'ULVR.L'
+
+        table = self.tables[ticker].astype(float)
+        table.drop(columns=['outlier'], inplace=True)
+        scaler = StandardScaler()
+        scaled_table = scaler.fit_transform(table)
+        # scaled_table = table.to_numpy()
+        num_of_features = scaled_table.shape[1]
+        table_X = []
+        table_Y = []
+        for i in range(past_days, len(scaled_table) - future_days + 1):
+            table_X.append(scaled_table[i - past_days:i, 0:num_of_features])
+            table_Y.append(scaled_table[i + future_days - 1:i + future_days, 0])
+
+        table_X, table_Y = np.array(table_X), np.array(table_Y)
+
+        # print(table_X.shape)
+
+        train_X, test_X = train_test_split(table_X, test_size=0.2, shuffle=False)
+        train_Y, test_Y = train_test_split(table_Y, test_size=0.2, shuffle=False)
+
+        # (num_of_rows, timestamps_per_row/how many previous days to consider, num_of_features)
+        model = Sequential()
+        model.add(LSTM(units=64, input_shape=(train_X.shape[1], train_X.shape[2]), return_sequences=True))
+        model.add(LSTM(units=32, return_sequences=False))
+        model.add(Dropout(0.2))
+        model.add(Dense(train_Y.shape[1]))
+
+        # print(model.summary())
+
+        model.compile(loss=MeanSquaredError(), optimizer='adam',
+                      metrics=[RootMeanSquaredError()])
+
+        model.fit(train_X, train_Y, batch_size=5, epochs=epoch_number, shuffle=False)
+
+        sampled_train_X = shap.utils.sample(train_X, 100)
+
+        explainer = shap.GradientExplainer(model, sampled_train_X) #(model.layers[0].input, model.layers[-1].output)
+        shap_values = explainer.shap_values(train_X)
+
+        #credit: https://medium.datadriveninvestor.com/time-step-wise-feature-importance-in-deep-learning-using-shap-e1c46a655455
+        shap_values = np.array(shap_values)
+        shap_values = np.reshape(shap_values,
+                                 (int(shap_values.shape[1]), int(shap_values.shape[2]), int(shap_values.shape[3])))
+        shap_abs = np.absolute(shap_values)
+        sum_0 = np.sum(shap_abs, axis=0)
+
+        features = table.columns
+
+        x_pos = [i for i, _ in enumerate(features)]
+        plt1 = plt.subplot(111)
+        plt1.barh(x_pos, sum_0[0])
+        plt1.set_yticks(x_pos)
+        plt1.set_yticklabels(features)
+        plt1.set_title('lag = 0 (today)')
+        plt.savefig("plots/lstm_summary_0.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+        plt2 = plt.subplot(111, sharex=plt1)
+        plt2.barh(x_pos, sum_0[1])
+        plt2.set_yticks(x_pos)
+        plt2.set_yticklabels(features)
+        plt2.set_title('lag = 1 (yesterday)')
+        plt.savefig("plots/lstm_summary_1.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+        plt3 = plt.subplot(111, sharex=plt1)
+        plt3.barh(x_pos, sum_0[2])
+        plt3.set_yticks(x_pos)
+        plt3.set_yticklabels(features)
+        plt3.set_title('lag = 2 (2 days ago)')
+        plt.savefig("plots/lstm_summary_2.png", bbox_inches='tight', dpi=100)
+        plt.show()
+
+        # shap.plots.waterfall(shap_values[0][0][0], max_display=14, show=False)
+        # plt.savefig("plots/lstm_waterfall_0_1.png", bbox_inches='tight', dpi=100)
+        # plt.show()
+        #
+        # plt.clf()
+        # shap.plots.waterfall(shap_values[0][0][1], max_display=14, show=False)
+        # plt.savefig("plots/lstm_waterfall_0_2.png", bbox_inches='tight', dpi=100)
+        # plt.show()
+        #
+        # plt.clf()
+        # shap.plots.waterfall(shap_values[0][0][2], max_display=14, show=False)
+        # plt.savefig("plots/lstm_waterfall_0_3.png", bbox_inches='tight', dpi=100)
+        # plt.show()
+        #
+        # plt.clf()
+        # shap.plots.beeswarm(shap_values, show=False)
+        # plt.savefig("plots/lstm_beeswarm.png", bbox_inches='tight', dpi=100)
+        # plt.show()
+        #
+        # plt.clf()
+        # shap.summary_plot(shap_values, test_X, plot_type='bar', show=False)
+        # plt.savefig("plots/lstm_summary_plot.png", bbox_inches='tight', dpi=100)
+        # plt.show()
+
+
+
+
 if __name__ == '__main__':
     # shap.initjs()
     tickers = ['AZN.L', 'SHEL.L', 'HSBA.L', 'ULVR.L', 'DGE.L', 'RIO.L', 'REL.L', 'NG.L', 'LSEG.L', 'VOD.L']
@@ -1260,7 +1342,7 @@ if __name__ == '__main__':
     # model_building.difference_in_AIC()
     # model_building.test_var()
 
-    model_building.test_lstm_variations('VOD.L')
+    # model_building.test_lstm_variations('VOD.L')
 
     # model_building.test_regression_day_forecasting()
     # model_building.test_best_var()
@@ -1278,8 +1360,10 @@ if __name__ == '__main__':
     # model_building.test_classification_plotting('REL.L')
     # model_building.test_classification_plotting('DGE.L')
 
+    # shap.initjs()
     # model_building.explain_regression()
     # model_building.explain_classification()
+    # model_building.explain_lstm()
 
 
 
