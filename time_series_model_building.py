@@ -1190,7 +1190,6 @@ class time_series_model_building:
         plt.savefig("plots/classification_waterfall_0.png", bbox_inches='tight', dpi=100)
         plt.show()
 
-
     def explain_lstm(self, past_days=3, future_days=1):
 
         epoch_number = 1
